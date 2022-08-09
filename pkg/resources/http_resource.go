@@ -15,37 +15,41 @@ const UA = "Maven Index Reader Go"
 
 type httpResource struct {
 	// provides access to the data represented by this Resource's URL
-	Reader io.ReadCloser
+	reader io.ReadCloser
 
 	// the URL associated with this Resource
-	URL net.URL
+	URL string
 
 	// logger instance
-	Logger log.Logger
+	Logger *log.Logger
 }
 
 // NewHttpResource -
-func NewHttpResource(logger log.Logger, uri string) (*httpResource, error) {
+func NewHttpResource(logger *log.Logger, uri string) (*httpResource, error) {
 	if _, err := url.Parse(uri); err != nil {
-		return nil, errors.Wrap(err, "NewHttpResource: invalid URI %q with cause", uri)
+		return nil, errors.Wrapf(err, "NewHttpResource: invalid URI %q with cause", uri)
 	}
 
 	return &httpResource{
 		Logger: logger,
 		URL:    uri,
-		Reader: nil,
-	}
+		reader: nil,
+	}, nil
 }
 
 // Read -
 func (hr *httpResource) Reader() (io.Reader, error) {
-	if hr.Reader != nil {
-		return nil, errors.Error("HttpResource: unexpected repeat call to Reader()")
+	if hr.reader != nil {
+		return nil, errors.New("HttpResource: unexpected repeat call to Reader()")
 	}
 
-	req := http.NewRequest("GET", hr.URL, nil)
-	req.AddHeader("User-Agent", UA)
-	req.AddHeader("Accept-Encoding", "gzip")
+	req, err := http.NewRequest("GET", hr.URL, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "HttpResource: failed to build GET req to %s with cause", hr.URL)
+	}
+
+	req.Header.Add("User-Agent", UA)
+	req.Header.Add("Accept-Encoding", "gzip")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -53,14 +57,14 @@ func (hr *httpResource) Reader() (io.Reader, error) {
 	}
 
 	// this Resource's owner now bears responsibility to call Close
-	hr.Reader = resp.Body // TODO(eli): do we need explicit gzip.NewReader(body) here?
-	return hr.Reader, nil
+	hr.reader = resp.Body // TODO(eli): do we need explicit gzip.NewReader(body) here?
+	return hr.reader, nil
 }
 
 // Close -
 func (hr *httpResource) Close() error {
-	if hr.Reader != nil {
-		hr.Reader.Close()
+	if hr.reader != nil {
+		hr.reader.Close()
 		return nil
 	}
 
