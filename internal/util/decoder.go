@@ -2,39 +2,144 @@ package util
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
-	//"io/ioutil"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 )
 
-// read a variable-length string in "Java modified UTF-8" encoding.
-// See DataInput#readUTF: https://docs.oracle.com/javase/6/docs/api/java/io/DataInput.html#readUTF%28%29
-func GetString(r io.Reader) (string, error) {
+// read a variable-length string in "Java modified UTF-8" encoding
+func ReadString(r io.Reader) (string, error) {
 	// step 1: read a uint16 representing the length
-	var strLenBuf [2]byte
-	_, err := r.Read(strLenBuf[:])
-	if err != nil && err != io.EOF {
-		return "", err
+	strByteLen, err := ReadUint16(r)
+	if err != nil {
+		return "", errors.Wrap(err, "ReadString: failed to read expected string length uint16 with cause")
 	}
-	strByteLen := int(binary.BigEndian.Uint16(strLenBuf[:]))
 
 	// step 2: read the expected string's buffer length in bytes from input stream
-	strBuf := make([]byte, strByteLen)
+	strBuf := make([]byte, int(strByteLen))
 	n, err := r.Read(strBuf)
 	if err != nil && err != io.EOF {
 		return "", err
 	}
-	if n < strByteLen {
-		return "", errors.Errorf("GetString: only read %d bytes of expected %d", n, strByteLen)
+	if n < int(strByteLen) {
+		return "", errors.Errorf("ReadString: only read %d bytes of expected %d", n, strByteLen)
 	}
 
-	// step 3: parse "Java modified UTF-8" encoding from buffer
+	return GetString(strBuf, int(strByteLen))
+}
+
+func ReadByte(r io.Reader) (byte, error) {
+	var arr [1]byte
+	_, err := r.Read(arr[:])
+	return arr[0], err
+}
+
+func ReadUint16(r io.Reader) (uint16, error) {
+	var arr [2]byte
+	n, err := r.Read(arr[:])
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+	if n != 2 {
+		return 0, errors.Errorf("GetUint16: expected to read 2 bytes, got: %d", n)
+	}
+
+	return binary.BigEndian.Uint16(arr[:]), nil
+
+}
+
+func ReadInt32(r io.Reader) (int32, error) {
+	var arr [4]byte
+	n, err := r.Read(arr[:])
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+	if n != 4 {
+		return 0, errors.Errorf("GetUint16: expected to read 4 bytes, got: %d", n)
+	}
+
+	return int32(binary.BigEndian.Uint32(arr[:])), nil
+
+}
+
+func ReadInt64(r io.Reader) (int64, error) {
+	var arr [8]byte
+	n, err := r.Read(arr[:])
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+	if n != 8 {
+		return 0, errors.Errorf("GetUint16: expected to read 8 bytes, got: %d", n)
+	}
+
+	return int64(binary.BigEndian.Uint64(arr[:])), nil
+}
+
+const (
+	yearPattern     = `(\d{4})`
+	monthPattern    = `(\d{2})`
+	datePattern     = `(\d{2})`
+	hoursPattern    = `(\d{2})`
+	minutesPattern  = `(\d{2})`
+	secondsPattern  = `(\d{2})`
+	millisPattern   = `\.(\d{3})`
+	timeZonePattern = `\s+([+-]\d{4})`
+)
+
+var mavenDateTimePattern = regexp.MustCompile(
+	yearPattern +
+		monthPattern +
+		datePattern +
+		hoursPattern +
+		minutesPattern +
+		secondsPattern +
+		millisPattern +
+		timeZonePattern)
+
+func ReadTimestamp(r io.Reader) (time.Time, error) {
+	timeStr, err := ReadString(r)
+	if err != nil {
+		return time.Now().UTC(), errors.Wrap(err, "ReadTimestamp: failed to obtain string from decoder with cause")
+	}
+
+	return GetTimestamp(timeStr)
+}
+
+func ReadVInt(r io.Reader) (int64, error) {
+	var out int64
+	var ndx = 0
+	var buf [1]byte
+	slc := buf[:]
+	_, err := r.Read(slc)
+	b := buf[0]
+
+	for err == nil {
+		val := b & 0x80
+		offset := ndx * 7
+		out |= (int64(val) << offset)
+		ndx++
+
+		if b == val {
+			break
+		}
+
+		_, err = r.Read(slc)
+		b = buf[0]
+	}
+
+	if err == io.EOF {
+		err = nil
+	}
+	return out, err
+}
+
+// Decode Go UTF-8 string from fixed-length byte buffer in "Java modified UTF-8" encoding.
+// See DataInput#readUTF: https://docs.oracle.com/javase/6/docs/api/java/io/DataInput.html#readUTF%28%29
+func GetString(strBuf []byte, strByteLen int) (string, error) {
+	// parse "Java modified UTF-8" encoding from byte buffer of expected length
 	ndx := 0
 	var out []rune
 	for ndx < strByteLen {
@@ -69,74 +174,10 @@ func GetString(r io.Reader) (string, error) {
 	return string(out), nil
 }
 
-func GetByte(r io.Reader) (byte, error) {
-	var arr [1]byte
-	_, err := r.Read(arr[:])
-	return arr[0], err
-}
-
-func GetUInt16(r io.Reader) (uint16, error) {
-	var arr [2]byte
-	_, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-
-	return binary.BigEndian.Uint16(arr[:]), nil
-
-}
-
-func GetInt32(r io.Reader) (int32, error) {
-	var arr [4]byte
-	_, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-
-	return int32(binary.BigEndian.Uint32(arr[:])), nil
-
-}
-
-func GetInt64(r io.Reader) (int64, error) {
-	var arr [8]byte
-	_, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-
-	return int64(binary.BigEndian.Uint64(arr[:])), nil
-}
-
-const (
-	yearPattern     = `(\d{4})`
-	monthPattern    = `(\d{2})`
-	datePattern     = `(\d{2})`
-	hoursPattern    = `(\d{2})`
-	minutesPattern  = `(\d{2})`
-	secondsPattern  = `(\d{2})`
-	millisPattern   = `\.(\d{3})`
-	timeZonePattern = `\s+([+-]?\d)`
-)
-
-var mavenDateTimePattern = regexp.MustCompile(
-	yearPattern +
-		monthPattern +
-		datePattern +
-		hoursPattern +
-		minutesPattern +
-		secondsPattern +
-		millisPattern +
-		timeZonePattern)
-
 // EXAMPLE INPUT: nexus.index.timestamp=20220801003457.736 +0000
 // formatter = new java.text.SimpleDateFormat("yyyyMMddHHmmss.SSS Z");
 // formatter.setTimeZone(java.util.TimeZone.getTimeZone("GMT"));
-func GetTimestamp(r io.Reader) (time.Time, error) {
-	timeStr, err := GetString(r)
-	if err != nil {
-		return time.Now().UTC(), errors.Wrap(err, "GetTimestamp: failed to obtain string from decoder with cause")
-	}
-
+func GetTimestamp(timeStr string) (time.Time, error) {
 	matches := mavenDateTimePattern.FindStringSubmatch(timeStr)
 	if matches == nil || len(matches) == 0 {
 		return time.Now().UTC(), errors.Errorf("GetTimestamp: no complete matches on input: %s", timeStr)
@@ -156,9 +197,16 @@ func GetTimestamp(r io.Reader) (time.Time, error) {
 	nanos := millis * 1000000
 
 	// translate Java formatter's time zone spec into time.Location
-	tzOffset, _ := strconv.Atoi(matches[7])
-	secsFromUTC := int((time.Duration(tzOffset) * time.Hour).Seconds())
-	location := time.FixedZone(fmt.Sprintf("from input: %s", matches[7]), secsFromUTC)
+	rawTZ := matches[8]
+	isNegOffset := rawTZ[0] == '-'
+	tzHours, _ := strconv.Atoi(rawTZ[1:3])
+	tzMinutes, _ := strconv.Atoi(rawTZ[3:])
+
+	secsFromUTC := (tzHours * 60 * 60) + (tzMinutes * 60)
+	if isNegOffset {
+		secsFromUTC = -secsFromUTC
+	}
+	location := time.FixedZone("TZ offset", secsFromUTC)
 
 	return time.Date(
 		year,
@@ -169,55 +217,4 @@ func GetTimestamp(r io.Reader) (time.Time, error) {
 		seconds,
 		nanos,
 		location), nil
-}
-
-func GetVInt(r io.Reader) (int64, error) {
-	var out int64
-	var ndx = 0
-	var buf [1]byte
-	slc := buf[:]
-	_, err := r.Read(slc)
-	b := buf[0]
-
-	for err == nil {
-		val := b & 0x80
-		offset := ndx * 7
-		out |= (int64(val) << offset)
-		ndx++
-
-		if b == val {
-			break
-		}
-
-		_, err = r.Read(slc)
-		b = buf[0]
-	}
-
-	if err == io.EOF {
-		err = nil
-	}
-	return out, err
-}
-
-var linesPattern = regexp.MustCompile(`\r\n`)
-
-func GetProperties(r io.Reader) (map[string]string, error) {
-	raw, err := GetString(r) //ioutil.ReadAll(r)
-	if err != nil {
-		return nil, errors.Wrap(err, "GetProperties: failed to read raw data from input with cause")
-	}
-
-	out := map[string]string{}
-	for ndx, line := range linesPattern.Split(raw, -1) {
-		key, value, found := strings.Cut(line, "=")
-		if !found {
-			return nil, errors.Errorf("GetProperties: line %d failed to parse into key and value: %s", ndx, line)
-		}
-
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		out[key] = value
-	}
-
-	return out, nil
 }

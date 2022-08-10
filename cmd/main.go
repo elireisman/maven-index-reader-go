@@ -4,29 +4,33 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/elireisman/maven-index-reader-go/internal/util"
+	"github.com/elireisman/maven-index-reader-go/pkg/readers"
 	"github.com/elireisman/maven-index-reader-go/pkg/resources"
 )
 
 const PropsURL = "https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties"
 
 func main() {
-	rsc, err := resources.NewHttpResource(log.Default(), PropsURL)
+	logger := log.Default()
+
+	rsc, err := resources.NewHttpResource(logger, PropsURL)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	rdr, err := rsc.Reader()
+	rdr, err := readers.NewProperties(logger, rsc)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	props, err := util.GetProperties(rdr)
-	if err != nil {
+	if err = rdr.Execute(); err != nil {
 		panic(err.Error())
 	}
 
-	for k, v := range props {
-		fmt.Printf("KEY(%s) => VALUE(%s)\n", k, v)
+	// test timestamp parsing
+	tsz, err := rdr.GetAsTimestamp("nexus.index.timestamp")
+	if err != nil {
+		panic(err.Error())
 	}
+	fmt.Printf("\nNEXUS TIMESTAMP: %s\n", tsz)
 }
