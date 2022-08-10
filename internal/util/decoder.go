@@ -28,7 +28,7 @@ func ReadString(r io.Reader) (string, error) {
 		return "", errors.Errorf("ReadString: only read %d bytes of expected %d", n, strByteLen)
 	}
 
-	return GetString(strBuf, int(strByteLen))
+	return GetString(strBuf)
 }
 
 func ReadByte(r io.Reader) (byte, error) {
@@ -138,14 +138,15 @@ func ReadVInt(r io.Reader) (int64, error) {
 
 // Decode Go UTF-8 string from fixed-length byte buffer in "Java modified UTF-8" encoding.
 // See DataInput#readUTF: https://docs.oracle.com/javase/6/docs/api/java/io/DataInput.html#readUTF%28%29
-func GetString(strBuf []byte, strByteLen int) (string, error) {
+func GetString(strBuf []byte) (string, error) {
 	// parse "Java modified UTF-8" encoding from byte buffer of expected length
 	ndx := 0
+	strByteLen := len(strBuf)
 	var out []rune
 	for ndx < strByteLen {
-		if (strBuf[ndx] & 0xe0) != 0 {
+		if (strBuf[ndx] & 0xe0) == 0xe0 {
 			// if the first byte begins with 1110 then there will be 3 bytes to decode
-			if ndx+2 < strByteLen {
+			if ndx+2 < strByteLen && legalTrailingByte(strBuf[ndx+1]) && legalTrailingByte(strBuf[ndx+2]) {
 				ch := rune(((strBuf[ndx] & 0x1f) << 12) |
 					((strBuf[ndx+1] & 0x3f) << 6) |
 					(strBuf[ndx+2] & 0x3f))
@@ -154,17 +155,24 @@ func GetString(strBuf []byte, strByteLen int) (string, error) {
 			} else {
 				return "", errors.Errorf("GetString: unexpected length 3 char at index %d of buffer of length %d", ndx, strByteLen)
 			}
-		} else if (strBuf[ndx] & 0xc) != 0 {
+		} else if (strBuf[ndx] & 0xc0) == 0xc0 {
 			// if the first byte begins with 1100 then there will be 2 bytes to decode
-			if ndx+1 < strByteLen {
+			if ndx+1 < strByteLen && legalTrailingByte(strBuf[ndx+1]) {
 				ch := rune(((strBuf[ndx] & 0x1f) << 6) | (strBuf[ndx+1] & 0x3f))
 				out = append(out, ch)
 				ndx += 2
 			} else {
 				return "", errors.Errorf("GetString: unexpected length 2 char at index %d of buffer of length %d", ndx, strByteLen)
 			}
-		} else { // TODO(eli): check docs, validate this is correct in all cases :)
-			// otherwise, just decode the byte we have
+		} else {
+			// if an expected single-byte rune begins with
+			// 1111xxxx or 10xxxxxx then it is invalid
+			if (strBuf[ndx]&0xf0) == 0xf0 || (strBuf[ndx]&0x80) == 0x80 {
+				return "", errors.Errorf("GetString: unexpected length 1 char at index %d of buffer of length %d", ndx, strByteLen)
+			}
+
+			// if the first byte does not begin with any of these
+			// bit prefix sequences, it can be decoded alone
 			ch := rune(strBuf[ndx])
 			out = append(out, ch)
 			ndx++
@@ -172,6 +180,10 @@ func GetString(strBuf []byte, strByteLen int) (string, error) {
 	}
 
 	return string(out), nil
+}
+
+func legalTrailingByte(b byte) bool {
+	return (b & 0x80) != 0x80
 }
 
 // EXAMPLE INPUT: nexus.index.timestamp=20220801003457.736 +0000

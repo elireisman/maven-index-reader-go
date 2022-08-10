@@ -95,8 +95,13 @@ func (pr *PropertiesReader) loadProperties() error {
 		return errors.Wrap(err, "PropertiesReader: failed to read raw data from input with cause")
 	}
 
+	goStr, err := util.GetString(raw)
+	if err != nil {
+		return errors.Wrap(err, "PropertiesReader: failed to convert data bytes from Java 'modified' UTF-8 with cause")
+	}
+
 	pr.properties = map[string]string{}
-	for ndx, line := range linesPattern.Split(string(raw), -1) {
+	for ndx, line := range linesPattern.Split(goStr, -1) {
 		// skip commented out lines
 		if strings.HasPrefix(line, "#") || line == "" {
 			continue
