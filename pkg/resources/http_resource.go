@@ -1,12 +1,11 @@
 package resources
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-
-	//"github.com/elireisman/maven-index-reader-go/internal/util"
 
 	"github.com/pkg/errors"
 )
@@ -35,6 +34,10 @@ func NewHttpResource(logger *log.Logger, uri string) (*httpResource, error) {
 		URL:    uri,
 		reader: nil,
 	}, nil
+}
+
+func (hr httpResource) String() string {
+	return fmt.Sprintf("%T{%s}", hr, hr.URL)
 }
 
 // Read -

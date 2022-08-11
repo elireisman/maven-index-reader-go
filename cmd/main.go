@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/readers"
@@ -18,19 +17,20 @@ func main() {
 		panic(err.Error())
 	}
 
-	rdr, err := readers.NewProperties(logger, rsc)
+	rdr, err := readers.NewPropertiesReader(logger, rsc)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	if err = rdr.Execute(); err != nil {
+	props, err := rdr.Read()
+	if err != nil {
 		panic(err.Error())
 	}
 
 	// test timestamp parsing
-	tsz, err := rdr.GetAsTimestamp("nexus.index.timestamp")
+	tsz, err := props.GetAsTimestamp("nexus.index.timestamp")
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("\nNEXUS TIMESTAMP: %s\n", tsz)
+	logger.Printf("\nNEXUS TIMESTAMP: %s\n", tsz)
 }
