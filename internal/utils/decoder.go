@@ -22,13 +22,18 @@ func ReadString(r io.Reader) (string, error) {
 	strBuf := make([]byte, int(strByteLen))
 	n, err := r.Read(strBuf)
 	if err != nil && err != io.EOF {
-		return "", err
+		return "", errors.Wrapf(err, "ReadString: failed to read expected buffer of size %d (got %d) with cause", strByteLen, n)
 	}
 	if n < int(strByteLen) {
 		return "", errors.Errorf("ReadString: only read %d bytes of expected %d", n, strByteLen)
 	}
 
-	return GetString(strBuf)
+	// if no parse error, conserve possible reader io.EOF for caller
+	s, sErr := GetString(strBuf)
+	if sErr == nil {
+		sErr = err
+	}
+	return s, sErr
 }
 
 func ReadByte(r io.Reader) (byte, error) {
@@ -47,7 +52,8 @@ func ReadUint16(r io.Reader) (uint16, error) {
 		return 0, errors.Errorf("GetUint16: expected to read 2 bytes, got: %d", n)
 	}
 
-	return binary.BigEndian.Uint16(arr[:]), nil
+	// if no parse error, conserve possible reader io.EOF for caller
+	return binary.BigEndian.Uint16(arr[:]), err
 
 }
 
@@ -61,7 +67,8 @@ func ReadInt32(r io.Reader) (int32, error) {
 		return 0, errors.Errorf("GetUint16: expected to read 4 bytes, got: %d", n)
 	}
 
-	return int32(binary.BigEndian.Uint32(arr[:])), nil
+	// if no parse error, conserve possible reader io.EOF for caller
+	return int32(binary.BigEndian.Uint32(arr[:])), err
 
 }
 
@@ -75,37 +82,22 @@ func ReadInt64(r io.Reader) (int64, error) {
 		return 0, errors.Errorf("GetUint16: expected to read 8 bytes, got: %d", n)
 	}
 
-	return int64(binary.BigEndian.Uint64(arr[:])), nil
+	// if no parse error, conserve possible reader io.EOF for caller
+	return int64(binary.BigEndian.Uint64(arr[:])), err
 }
-
-const (
-	yearPattern     = `(\d{4})`
-	monthPattern    = `(\d{2})`
-	datePattern     = `(\d{2})`
-	hoursPattern    = `(\d{2})`
-	minutesPattern  = `(\d{2})`
-	secondsPattern  = `(\d{2})`
-	millisPattern   = `\.(\d{3})`
-	timeZonePattern = `\s+([+-]\d{4})`
-)
-
-var mavenDateTimePattern = regexp.MustCompile(
-	yearPattern +
-		monthPattern +
-		datePattern +
-		hoursPattern +
-		minutesPattern +
-		secondsPattern +
-		millisPattern +
-		timeZonePattern)
 
 func ReadTimestamp(r io.Reader) (time.Time, error) {
 	timeStr, err := ReadString(r)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return time.Now().UTC(), errors.Wrap(err, "ReadTimestamp: failed to obtain string from decoder with cause")
 	}
 
-	return GetTimestamp(timeStr)
+	// if no parse error, conserve possible reader io.EOF for caller
+	t, tErr := GetTimestamp(timeStr)
+	if tErr == nil {
+		tErr = err
+	}
+	return t, tErr
 }
 
 func ReadVInt(r io.Reader) (int64, error) {
@@ -130,9 +122,7 @@ func ReadVInt(r io.Reader) (int64, error) {
 		b = buf[0]
 	}
 
-	if err == io.EOF {
-		err = nil
-	}
+	// a well-formed "out" can be returned with an io.EOF
 	return out, err
 }
 
@@ -185,6 +175,27 @@ func GetString(strBuf []byte) (string, error) {
 func legalTrailingByte(b byte) bool {
 	return (b & 0x80) != 0x80
 }
+
+const (
+	yearPattern     = `(\d{4})`
+	monthPattern    = `(\d{2})`
+	datePattern     = `(\d{2})`
+	hoursPattern    = `(\d{2})`
+	minutesPattern  = `(\d{2})`
+	secondsPattern  = `(\d{2})`
+	millisPattern   = `\.(\d{3})`
+	timeZonePattern = `\s+([+-]\d{4})`
+)
+
+var mavenDateTimePattern = regexp.MustCompile(
+	yearPattern +
+		monthPattern +
+		datePattern +
+		hoursPattern +
+		minutesPattern +
+		secondsPattern +
+		millisPattern +
+		timeZonePattern)
 
 // EXAMPLE INPUT: nexus.index.timestamp=20220801003457.736 +0000
 // formatter = new java.text.SimpleDateFormat("yyyyMMddHHmmss.SSS Z");
