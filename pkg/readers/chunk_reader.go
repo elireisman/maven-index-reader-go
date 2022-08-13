@@ -44,6 +44,7 @@ func (cr ChunkReader) Read() error {
 		return errors.Wrapf(err, "ChunkReader: failed to obtain data stream from %s with cause", cr.resource)
 	}
 
+	// TODO(eli): we may NOT need to wrap this just for chunks
 	gzRdr, err := gzip.NewReader(rdr)
 	if err != nil {
 		cr.resource.Close()
@@ -94,6 +95,7 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 
 		rawRecord := map[string]string{}
 		for ndx := int32(0); ndx < fieldCount; ndx++ {
+			// we ignore each Record's 1 byte of index bit flags
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
 				cr.logger.Panicf(
@@ -101,6 +103,8 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 					count, cr.resource, err)
 			}
 
+			// a Record's *key* conforms to standard Java "readUTF" behavior
+			// including a max size field of 2 bytes (uint16)
 			var key string
 			key, err = utils.ReadString(gzRdr)
 			if err != nil {
@@ -109,9 +113,12 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 					count, cr.resource, err)
 			}
 
+			// a Record's *value* can be larger; the size field is 4 bytes (int32)
+			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/ChunkReader.java#L189
+			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/ChunkReader.java#L196
 			var value string
-			value, err = utils.ReadString(gzRdr)
-			if err != nil && err != io.EOF {
+			value, err = utils.ReadLargeString(gzRdr)
+			if err != nil && errors.Cause(err) != io.EOF {
 				cr.logger.Panicf(
 					"ChunkReader: failed to read field value for key %s on record %d from %s with cause: %s",
 					key, count, cr.resource, err)
@@ -120,18 +127,31 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 			rawRecord[key] = value
 		}
 
-		record, rErr := data.NewRecord(rawRecord)
+		record, rErr := data.NewRecord(cr.logger, rawRecord)
+		if isSkippableRecordType(record) {
+			cr.logger.Printf("ChunkReader: skipped Record by type %+v", record)
+			if errors.Cause(err) == io.EOF {
+				return
+			}
+			continue
+		}
 		if rErr != nil {
 			cr.logger.Panicf(
 				"ChunkReader: failed to compose well-formed record %d from %s from %s with cause: %s (at EOF: %t)",
-				count, rawRecord, cr.resource, rErr, err == io.EOF)
+				count, rawRecord, cr.resource, rErr, errors.Cause(err) == io.EOF)
 		}
+
 		cr.buffer <- record
 
-		if err == io.EOF {
+		if errors.Cause(err) == io.EOF {
 			cr.logger.Printf("ChunkReader: successfully published %d records from %s", count, cr.resource)
 			return
 		}
 		count++
 	}
+}
+
+func isSkippableRecordType(record data.Record) bool {
+	return record.Type() != data.ArtifactAdd &&
+		record.Type() != data.ArtifactRemove
 }

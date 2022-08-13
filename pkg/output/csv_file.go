@@ -34,18 +34,35 @@ func (c CSV) Write() error {
 	count := 0
 	headersWritten := false
 	for record := range c.input {
+		var values []string
+
 		if !headersWritten {
 			// ordered array or strings
 			keys := record.Keys()
 			_, err := w.WriteString(strings.Join(keys, ",") + "\n")
 			if err != nil {
-				return errors.Wrap(err, "CSV: failed to write headers to file %s with cause")
+				return errors.Wrapf(err, "CSV: failed to write headers to file %s with cause", c.filePath)
 			}
 			headersWritten = true
 		}
 
-		// ordered array of any/interfaces?
-		values := record.Values()
+		for i := 0; i < len(record.Keys()); i++ {
+			key := record.Keys()[i]
+			value, err := record.Get(key)
+			if err != nil {
+				return errors.Wrapf(err, "CSV: failed to resolve expected Record value for key %s with cause", key)
+			}
+
+			// TODO(eli): each "raw" value will need to be:
+			// 1. Scanned and escaped for CSV separator values!
+			// 2. Multiple-values must be formatted properly etc.
+			formattedValue := ""
+			if value != nil {
+				formattedValue = value.String()
+			}
+			values = append(values, formattedValue)
+		}
+
 		_, err := w.WriteString(strings.Join(values, ",") + "\n")
 		if err != nil {
 			return errors.Wrap(err, "CSV: failed to write values to file %s with cause")

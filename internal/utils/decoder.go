@@ -12,23 +12,38 @@ import (
 
 // read a variable-length string in "Java modified UTF-8" encoding
 func ReadString(r io.Reader) (string, error) {
-	// step 1: read a uint16 representing the length
-	strByteLen, err := ReadUint16(r)
+	size, err := ReadUint16(r)
 	if err != nil {
-		return "", errors.Wrap(err, "ReadString: failed to read expected string length uint16 with cause")
+		return "", errors.Wrap(err, "ReadUTF8String: failed to read expected string length uint16 with cause")
 	}
 
-	// step 2: read the expected string's buffer length in bytes from input stream
-	strBuf := make([]byte, int(strByteLen))
+	return readUTF8String(r, int(size))
+}
+
+// read a variable-length string in "Java modified UTF-8" encoding.
+func ReadLargeString(r io.Reader) (string, error) {
+	size, err := ReadInt32(r)
+	if err != nil {
+		return "", errors.Wrap(err, "ReadUTF8StringLong: failed to read expected string length int32 with cause")
+	}
+
+	return readUTF8String(r, int(size))
+}
+
+// read a variable-length string in "Java modified UTF-8" encoding
+func readUTF8String(r io.Reader, strByteLen int) (string, error) {
+	// read the expected string's buffer length in bytes from input stream
+	strBuf := make([]byte, strByteLen)
 	n, err := r.Read(strBuf)
 	if err != nil && err != io.EOF {
-		return "", errors.Wrapf(err, "ReadString: failed to read expected buffer of size %d (got %d) with cause", strByteLen, n)
+		return "", errors.Wrapf(err, "readUTF8String: failed to read expected buffer of size %d (got %d) with cause", strByteLen, n)
 	}
-	if n < int(strByteLen) {
-		return "", errors.Errorf("ReadString: only read %d bytes of expected %d", n, strByteLen)
+	if n < strByteLen {
+		return "", errors.Errorf("readUTF8String: only read %d bytes of expected %d", n, strByteLen)
 	}
 
-	// if no parse error, conserve possible reader io.EOF for caller
+	// parse the buffer into std UTF-8. if no parse error,
+	// conserve possible reader io.EOF for caller
 	s, sErr := GetString(strBuf)
 	if sErr == nil {
 		sErr = err
@@ -36,12 +51,14 @@ func ReadString(r io.Reader) (string, error) {
 	return s, sErr
 }
 
+// ReadByte -
 func ReadByte(r io.Reader) (byte, error) {
 	var arr [1]byte
 	_, err := r.Read(arr[:])
 	return arr[0], err
 }
 
+// ReadUint16 -
 func ReadUint16(r io.Reader) (uint16, error) {
 	var arr [2]byte
 	n, err := r.Read(arr[:])
@@ -57,6 +74,7 @@ func ReadUint16(r io.Reader) (uint16, error) {
 
 }
 
+// ReadInt32 -
 func ReadInt32(r io.Reader) (int32, error) {
 	var arr [4]byte
 	n, err := r.Read(arr[:])
@@ -72,6 +90,7 @@ func ReadInt32(r io.Reader) (int32, error) {
 
 }
 
+// ReadInt64 -
 func ReadInt64(r io.Reader) (int64, error) {
 	var arr [8]byte
 	n, err := r.Read(arr[:])
@@ -86,6 +105,7 @@ func ReadInt64(r io.Reader) (int64, error) {
 	return int64(binary.BigEndian.Uint64(arr[:])), err
 }
 
+// ReadTimestamp -
 func ReadTimestamp(r io.Reader) (time.Time, error) {
 	timeStr, err := ReadString(r)
 	if err != nil && err != io.EOF {
@@ -100,6 +120,7 @@ func ReadTimestamp(r io.Reader) (time.Time, error) {
 	return t, tErr
 }
 
+// ReadVInt -
 func ReadVInt(r io.Reader) (int64, error) {
 	var out int64
 	var ndx = 0
@@ -124,6 +145,10 @@ func ReadVInt(r io.Reader) (int64, error) {
 
 	// a well-formed "out" can be returned with an io.EOF
 	return out, err
+}
+
+func legalTrailingByte(b byte) bool {
+	return (b & 0x80) != 0x80
 }
 
 // Decode Go UTF-8 string from fixed-length byte buffer in "Java modified UTF-8" encoding.
@@ -172,10 +197,6 @@ func GetString(strBuf []byte) (string, error) {
 	return string(out), nil
 }
 
-func legalTrailingByte(b byte) bool {
-	return (b & 0x80) != 0x80
-}
-
 const (
 	yearPattern     = `(\d{4})`
 	monthPattern    = `(\d{2})`
@@ -197,7 +218,10 @@ var mavenDateTimePattern = regexp.MustCompile(
 		millisPattern +
 		timeZonePattern)
 
-// EXAMPLE INPUT: nexus.index.timestamp=20220801003457.736 +0000
+// GetTimestamp - example input:
+// nexus.index.timestamp=20220801003457.736 +0000
+//
+// Mimics functionality of:
 // formatter = new java.text.SimpleDateFormat("yyyyMMddHHmmss.SSS Z");
 // formatter.setTimeZone(java.util.TimeZone.getTimeZone("GMT"));
 func GetTimestamp(timeStr string) (time.Time, error) {

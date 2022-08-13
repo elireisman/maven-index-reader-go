@@ -1,7 +1,6 @@
 package output
 
-// Output - all output formatters (stateful or not)
-// are composable by meeting this contract
+// Output - contract for supported ouput formats
 type Output interface {
 	Write() error
 }
