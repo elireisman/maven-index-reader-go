@@ -2,6 +2,7 @@ package output
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -48,17 +49,14 @@ func (c CSV) Write() error {
 
 		for i := 0; i < len(record.Keys()); i++ {
 			key := record.Keys()[i]
-			value, err := record.Get(key)
-			if err != nil {
-				return errors.Wrapf(err, "CSV: failed to resolve expected Record value for key %s with cause", key)
-			}
+			value := record.Get(key)
 
 			// TODO(eli): each "raw" value will need to be:
 			// 1. Scanned and escaped for CSV separator values!
-			// 2. Multiple-values must be formatted properly etc.
+			// 2. Multiple-entry values ([]string, etc.) must be formatted properly etc.
 			formattedValue := ""
 			if value != nil {
-				formattedValue = value.String()
+				formattedValue = fmt.Sprintf("%v", value)
 			}
 			values = append(values, formattedValue)
 		}

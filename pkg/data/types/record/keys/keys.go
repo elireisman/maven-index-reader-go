@@ -11,7 +11,7 @@ const (
 	Del = "del"
 
 	// Key of repository ID entry, that contains {@link String}.
-	RepositoryId = "repositoryId"
+	RepositoryID = "repositoryId"
 
 	// Key of all groups list entry, that contains {@link java.util.List<String>}.
 	AllGroups     = "allGroups"
@@ -163,7 +163,7 @@ const (
 	 * Key of OSGi "Bundle-DocURL" manifest entry, that contains {@link String}. Extracted by {@code
 	 * OsgiArtifactIndexCreator}.
 	 */
-	OSGIExportDocURL = "Bundle-DocURL"
+	OSGIBundleDocURL = "Bundle-DocURL"
 
 	/**
 	 * Key of OSGi "Import-Package" manifest entry, that contains {@link String}. Extracted by {@code
@@ -205,5 +205,5 @@ const (
 	 * Key for SHA-256 checksum  needed for OSGI content capability that contains {@link String}. Extracted by {@code
 	 * OsgiArtifactIndexCreator}.
 	 */
-	SHA256 = "sha256"
+	OSGISHA256 = "sha256"
 )
