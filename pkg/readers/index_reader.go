@@ -15,20 +15,16 @@ type IndexReader struct {
 	cfg      config.Index
 	logger   *log.Logger
 	resource resources.Resource
-	buffer   chan data.Chunk
+	buffer   chan data.Record
 }
 
-func NewIndexReader(l *log.Logger, r resources.Resource, b chan data.Chunk, c config.Index) IndexReader {
+func NewIndexReader(l *log.Logger, r resources.Resource, b chan data.Record, c config.Index) IndexReader {
 	return IndexReader{
 		cfg:      c,
 		logger:   l,
 		resource: r,
 		buffer:   b,
 	}
-}
-
-func (ir IndexReader) Get() <-chan data.Chunk {
-	return ir.buffer
 }
 
 // TODO(eli): IMPLMENT THIS

@@ -5,11 +5,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
 
 	"github.com/pkg/errors"
+)
+
+var (
+	commaPattern    = regexp.MustCompile(`,`)
+	dblQuotePattern = regexp.MustCompile(`"`)
 )
 
 type CSV struct {
@@ -23,6 +30,12 @@ func NewCSV(l *log.Logger, fp string, in <-chan data.Record) CSV {
 }
 
 func (c CSV) Write() error {
+	path := filepath.Dir(c.filePath)
+	err := os.MkdirAll(path, 0755)
+	if err != nil {
+		return errors.Wrapf(err, "JSON: failed to create output directory at %s with cause", path)
+	}
+
 	f, err := os.Create(c.filePath)
 	if err != nil {
 		return errors.Wrapf(err, "CSV: failed to create output file at %s with cause", c.filePath)
@@ -56,7 +69,7 @@ func (c CSV) Write() error {
 			// 2. Multiple-entry values ([]string, etc.) must be formatted properly etc.
 			formattedValue := ""
 			if value != nil {
-				formattedValue = fmt.Sprintf("%v", value)
+				formattedValue = escapeForCSV(value)
 			}
 			values = append(values, formattedValue)
 		}
@@ -71,4 +84,15 @@ func (c CSV) Write() error {
 
 	c.logger.Printf("CSV: successfully persisted %d records to file %s", count, c.filePath)
 	return nil
+}
+
+func escapeForCSV(value interface{}) string {
+	raw := fmt.Sprintf("%v", value)
+
+	if strings.ContainsAny(raw, `",`) {
+		escaped := dblQuotePattern.ReplaceAllString(raw, `"""`)
+		return `"` + commaPattern.ReplaceAllString(escaped, `","`) + `"`
+	}
+
+	return raw
 }

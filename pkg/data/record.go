@@ -128,6 +128,13 @@ func (r Record) Get(key keys.Record) interface{} {
 	return val
 }
 
+// Payload - obtain the full internal representation of the Record's
+// data attributes. Useful for output formats that can more easily work
+// with this data
+func (r Record) Payload() map[keys.Record]interface{} {
+	return r.data
+}
+
 // NewRecord - parses the input map then populates
 // and returns a well-formed Record, or an error.
 func NewRecord(logger *log.Logger, indexRecord map[string]string) (Record, error) {

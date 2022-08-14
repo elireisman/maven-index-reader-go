@@ -18,7 +18,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&OutputFormat, "out", "log", "one of 'log', 'json', 'csv', 'sqlite'")
+	flag.StringVar(&OutputFormat, "out", "log", "one of 'log', 'json', 'csv'")
 	flag.StringVar(&Target, "target", "", "if set, specifies the target output file or path. depends on argument to --out")
 	flag.BoolVar(&Backfill, "backfill", false, "if set, indicates a full import of all segments of the source index should be performed")
 	flag.StringVar(&FromTime, "from", "", "if set, represents the timestamp of the previous incremental update as a time.Parse-compatible string")

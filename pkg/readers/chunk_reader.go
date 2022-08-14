@@ -19,18 +19,14 @@ type ChunkReader struct {
 	buffer   chan data.Record
 }
 
-// NewChunkReader -
+// NewChunkReader - caller supplies the input resource as well as the
+// output channel for captured records that the caller plans to consume
 func NewChunkReader(l *log.Logger, r resources.Resource, b chan data.Record) ChunkReader {
 	return ChunkReader{
 		logger:   l,
 		resource: r,
 		buffer:   b,
 	}
-}
-
-// Get - obtain read-only channel the caller can consume data.Records from
-func (cr ChunkReader) Get() <-chan data.Record {
-	return cr.buffer
 }
 
 // Read - initiate async consumption of Resource and population of data.Record buffer
