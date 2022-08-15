@@ -20,7 +20,7 @@ type PropertiesReader struct {
 	resource resources.Resource
 }
 
-func NewPropertiesReader(l *log.Logger, r resources.Resource) (PropertiesReader, error) {
+func NewProperties(l *log.Logger, r resources.Resource) (PropertiesReader, error) {
 	return PropertiesReader{
 		logger:   l,
 		resource: r,

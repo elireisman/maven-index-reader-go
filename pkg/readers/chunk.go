@@ -13,16 +13,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ChunkReader struct {
+type Chunk struct {
 	logger   *log.Logger
 	resource resources.Resource
 	buffer   chan data.Record
 }
 
-// NewChunkReader - caller supplies the input resource as well as the
+// NewChunk - caller supplies the input resource as well as the
 // output channel for captured records that the caller plans to consume
-func NewChunkReader(l *log.Logger, r resources.Resource, b chan data.Record) ChunkReader {
-	return ChunkReader{
+func NewChunk(l *log.Logger, r resources.Resource, b chan data.Record) Chunk {
+	return Chunk{
 		logger:   l,
 		resource: r,
 		buffer:   b,
@@ -30,21 +30,21 @@ func NewChunkReader(l *log.Logger, r resources.Resource, b chan data.Record) Chu
 }
 
 // Read - initiate async consumption of Resource and population of data.Record buffer
-func (cr ChunkReader) Read() error {
+func (cr Chunk) Read() error {
 	if cr.resource == nil {
-		return errors.New("ChunkReader: cannot read from nil Resource")
+		return errors.New("Chunk: cannot read from nil Resource")
 	}
 
 	rdr, err := cr.resource.Reader()
 	if err != nil {
-		return errors.Wrapf(err, "ChunkReader: failed to obtain data stream from %s with cause", cr.resource)
+		return errors.Wrapf(err, "Chunk: failed to obtain data stream from %s with cause", cr.resource)
 	}
 
 	// TODO(eli): we may NOT need to wrap this just for chunks
 	gzRdr, err := gzip.NewReader(rdr)
 	if err != nil {
 		cr.resource.Close()
-		return errors.Wrapf(err, "ChunkReader: failed to wrap %s in GZIP Reader with cause", cr.resource)
+		return errors.Wrapf(err, "Chunk: failed to wrap %s in GZIP Reader with cause", cr.resource)
 	}
 
 	var chunkVersion uint8
@@ -52,7 +52,7 @@ func (cr ChunkReader) Read() error {
 		chunkVersion = uint8(b)
 	} else {
 		gzRdr.Close()
-		return errors.Wrap(err, "ChunkReader: failed to read chunk version with cause")
+		return errors.Wrap(err, "Chunk: failed to read chunk version with cause")
 	}
 
 	var chunkTimestamp time.Time
@@ -62,17 +62,17 @@ func (cr ChunkReader) Read() error {
 		chunkTimestamp = time.Unix(secs, nanos)
 	} else {
 		gzRdr.Close()
-		return errors.Wrap(err, "ChunkReader: failed to read chunk timestamp with cause")
+		return errors.Wrap(err, "Chunk: failed to read chunk timestamp with cause")
 	}
 
 	// this goroutine now owns GZIP Reader and must close it
-	cr.logger.Printf("ChunkReader: found %s of version %d at time %s", cr.resource, chunkVersion, chunkTimestamp)
+	cr.logger.Printf("Chunk: found %s of version %d at time %s", cr.resource, chunkVersion, chunkTimestamp)
 	go cr.recordIterator(gzRdr, chunkVersion, chunkTimestamp)
 
 	return nil
 }
 
-func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTimestamp time.Time) {
+func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTimestamp time.Time) {
 	defer func() {
 		gzRdr.Close()
 		close(cr.buffer)
@@ -85,7 +85,7 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 		fieldCount, err = utils.ReadInt32(gzRdr)
 		if err != nil {
 			cr.logger.Panicf(
-				"ChunkReader: failed to read field count for record %d from %s with cause: %s",
+				"Chunk: failed to read field count for record %d from %s with cause: %s",
 				count, cr.resource, err)
 		}
 
@@ -95,7 +95,7 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
 				cr.logger.Panicf(
-					"ChunkReader: failed to read field flags for record %d from %s with cause: %s",
+					"Chunk: failed to read field flags for record %d from %s with cause: %s",
 					count, cr.resource, err)
 			}
 
@@ -105,18 +105,18 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 			key, err = utils.ReadString(gzRdr)
 			if err != nil {
 				cr.logger.Panicf(
-					"ChunkReader: failed to read field key for record %d from %s with cause: %s",
+					"Chunk: failed to read field key for record %d from %s with cause: %s",
 					count, cr.resource, err)
 			}
 
 			// a Record's *value* can be larger; the size field is 4 bytes (int32)
-			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/ChunkReader.java#L189
-			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/ChunkReader.java#L196
+			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L189
+			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L196
 			var value string
 			value, err = utils.ReadLargeString(gzRdr)
 			if err != nil && errors.Cause(err) != io.EOF {
 				cr.logger.Panicf(
-					"ChunkReader: failed to read field value for key %s on record %d from %s with cause: %s",
+					"Chunk: failed to read field value for key %s on record %d from %s with cause: %s",
 					key, count, cr.resource, err)
 			}
 
@@ -125,7 +125,7 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
 		if isSkippableRecordType(record) {
-			cr.logger.Printf("ChunkReader: skipped Record by type %+v", record)
+			cr.logger.Printf("Chunk: skipped Record by type %+v", record)
 			if errors.Cause(err) == io.EOF {
 				return
 			}
@@ -133,14 +133,14 @@ func (cr ChunkReader) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, ch
 		}
 		if rErr != nil {
 			cr.logger.Panicf(
-				"ChunkReader: failed to compose well-formed record %d from %s from %s with cause: %s (at EOF: %t)",
+				"Chunk: failed to compose well-formed record %d from %s from %s with cause: %s (at EOF: %t)",
 				count, rawRecord, cr.resource, rErr, errors.Cause(err) == io.EOF)
 		}
 
 		cr.buffer <- record
 
 		if errors.Cause(err) == io.EOF {
-			cr.logger.Printf("ChunkReader: successfully published %d records from %s", count, cr.resource)
+			cr.logger.Printf("Chunk: successfully published %d records from %s", count, cr.resource)
 			return
 		}
 		count++
