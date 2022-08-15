@@ -5,7 +5,7 @@ import (
 
 	//"github.com/elireisman/maven-index-reader-go/internal/utils"
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
-	//"github.com/elireisman/maven-index-reader-go/pkg/data"
+	"github.com/elireisman/maven-index-reader-go/pkg/data"
 	"github.com/elireisman/maven-index-reader-go/pkg/resources"
 
 	"github.com/pkg/errors"
@@ -27,9 +27,8 @@ func NewIndex(l *log.Logger, b chan Chunk, c config.Index) Index {
 	}
 }
 
-// TODO(eli): IMPLMENT THIS
 func (ir Index) Read() error {
-	// 1. load props file
+	// load remote index properties file
 	rsc, err := ir.resourceFromConfig(".properties")
 	if err != nil {
 		return errors.Wrap(err, "from Index#Read")
@@ -58,11 +57,33 @@ func (ir Index) Read() error {
 	}
 	ir.logger.Printf("Resolved Nexus last incremented chunk index: %d", lastIncr)
 
-	// 2. compare to config.Index settings
-	// 3. build Index (which will build and regulate with queue + fixed worker pool for Chunk readers)
-	// 4. caller will consume from given "chan data.Record" into selected output format!
+	// validate fetched properties against expected config.Index settings, or bail
+	if err := ir.validateProperties(props); err != nil {
+		return errors.Wrap(err, "from Index#Read")
+	}
 
 	// TODO(eli): IMPLEMENT!
+
+	return nil
+}
+
+func (ir Index) validateProperties(props data.Properties) error {
+	indexID, err := props.GetAsString("nexus.index.id")
+	if err != nil {
+		return err
+	}
+	if ir.cfg.Meta.ID != indexID {
+		return errors.Errorf("failed to validate expected index ID %s, got: %s", ir.cfg.Meta.ID, indexID)
+	}
+
+	chainID, err := props.GetAsString("nexus.index.chain-id")
+	if err != nil {
+		return err
+	}
+	if ir.cfg.Meta.ChainID != chainID {
+		return errors.Errorf("failed to validate expected chain ID %s, got: %s", ir.cfg.Meta.ChainID, chainID)
+	}
+
 	return nil
 }
 

@@ -32,7 +32,7 @@ func main() {
 	mavenCentralCfg := config.Index{
 		Meta: config.Meta{
 			ID:      "central",
-			ChainID: 1318453614498, // from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
+			ChainID: "1318453614498", // from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
 			Target:  "nexus-maven-repository-index",
 		},
 		Source: config.Source{
@@ -51,4 +51,9 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+
+	// TODO(eli):
+	// 1. create output format (or delegate to readers.Chunk via config.Index...?)
+	// 2. create fixed-size worker pool to consume readers.Chunk from chan
+	// 3. (see ? from step 1): create worker pool to consume data.Records from readers.Chunk(s) ?
 }

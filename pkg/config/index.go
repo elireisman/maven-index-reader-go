@@ -9,7 +9,7 @@ type Index struct {
 
 type Meta struct {
 	ID      string // expected index ID, as in "nexus.index.id"
-	ChainID int64  // expected chain ID, as in "nexus.index.chain-id"
+	ChainID string // expected chain ID, as in "nexus.index.chain-id"
 	Target  string // expected base name of source index resources like "nexus-maven-repository-index"
 }
 
