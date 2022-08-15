@@ -4,11 +4,10 @@ import (
 	"flag"
 	"log"
 
-	"github.com/elireisman/maven-index-reader-go/pkg/readers"
-	"github.com/elireisman/maven-index-reader-go/pkg/resources"
+	"github.com/elireisman/maven-index-reader-go/pkg/client"
+	"github.com/elireisman/maven-index-reader-go/pkg/config"
+	"github.com/elireisman/maven-index-reader-go/pkg/data"
 )
-
-const PropsURL = "https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties"
 
 var (
 	OutputFormat string
@@ -28,26 +27,13 @@ func main() {
 	flag.Parse()
 
 	logger := log.Default()
+	out := make(chan data.Record, 128)
+	cfg := config.Index{}
 
-	rsc, err := resources.NewHttpResource(logger, PropsURL)
+	mavenCentral := client.NewMavenCentral(logger, out, cfg)
+
+	err := mavenCentral.Start()
 	if err != nil {
 		panic(err.Error())
 	}
-
-	rdr, err := readers.NewPropertiesReader(logger, rsc)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	props, err := rdr.Read()
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// test timestamp parsing
-	tsz, err := props.GetAsTimestamp("nexus.index.timestamp")
-	if err != nil {
-		panic(err.Error())
-	}
-	logger.Printf("\nNEXUS TIMESTAMP: %s\n", tsz)
 }
