@@ -1,6 +1,7 @@
 package readers
 
 import (
+	"fmt"
 	"log"
 
 	//"github.com/elireisman/maven-index-reader-go/internal/utils"
@@ -62,9 +63,32 @@ func (ir Index) Read() error {
 		return errors.Wrap(err, "from Index#Read")
 	}
 
+	targetChunks := ir.createChunksList(lastIncr)
+	ir.logger.Printf("Resolved chunk list: %v", targetChunks)
+
 	// TODO(eli): IMPLEMENT!
 
 	return nil
+}
+
+func (ir Index) createChunksList(latestChunk int) []string {
+	var out []string
+
+	// TODO(eli): check that NEXT (+1) CHUNK ISN'T ALSO AVAILABLE? USE HTTP HEAD REQS TO CHECK? OR TSZ + VER SCAN PER-CHUNK?
+	if ir.cfg.Mode.Incremental {
+		// assumption: this was incremented during LAST SUCCESSFUL RUN and is UNSEEN as of now!
+		prevChunk := ir.cfg.Mode.FromChunk
+		chunkPattern := ir.cfg.Source.Base + ir.cfg.Meta.Target + ".%d.gz"
+		for prevChunk <= latestChunk {
+			out = append(out, fmt.Sprintf(chunkPattern, prevChunk))
+			prevChunk++
+		}
+	} else {
+		fullIndexChunk := ir.cfg.Source.Base + ir.cfg.Meta.Target + ".gz"
+		out = append(out, fullIndexChunk)
+	}
+
+	return out
 }
 
 func (ir Index) validateProperties(props data.Properties) error {
