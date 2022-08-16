@@ -37,8 +37,9 @@ func readUTF8String(r io.Reader, strByteLen int) (string, error) {
 		return "", errors.Wrapf(err, "readUTF8String: failed to read expected buffer of size %d (got %d) with cause", strByteLen, n)
 	}
 	if n < strByteLen {
-		return "", errors.Errorf("readUTF8String: only read %d bytes of expected %d", n, strByteLen)
+		return "", errors.Errorf("readUTF8String: only read %d bytes of expected %d got: %v", n, strByteLen, strBuf)
 	}
+	// TODO(eli): while next byte == 0, do: `b := [1]byte{}; r.Read(b[:])` to flush buffer to (strByteLen - n) ???
 
 	// parse the buffer into std UTF-8. if no parse error,
 	// conserve possible reader io.EOF for caller

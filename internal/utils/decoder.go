@@ -25,9 +25,14 @@ func GetString(strBuf []byte) (string, error) {
 				out = append(out, ch)
 				ndx += 3
 			} else {
+				if strBuf[ndx+1] == 0 || strBuf[ndx+2] == 0 {
+					return "", errors.Errorf(
+						"GetString: unexpected 0 bytes after index %d of buffer of length %d: %v",
+						ndx, strByteLen, strBuf[ndx:])
+				}
 				return "", errors.Errorf(
-					"GetString: unexpected length 3 char at index %d of buffer of length %d: %s <FROM> %s",
-					ndx, strByteLen, string(strBuf[ndx:ndx+3]), string(strBuf))
+					"GetString: unexpected length 3 char at index %d of buffer of length %d: %s",
+					ndx, strByteLen, string(strBuf[ndx:ndx+3]))
 			}
 		} else if (strBuf[ndx] & 0xc0) == 0xc0 {
 			// if the first byte begins with 1100 then there will be 2 bytes to decode
@@ -36,17 +41,40 @@ func GetString(strBuf []byte) (string, error) {
 				out = append(out, ch)
 				ndx += 2
 			} else {
-				return "", errors.Errorf("GetString: unexpected length 2 char at index %d of buffer of length %d", ndx, strByteLen)
+				if strBuf[ndx+1] == 0 {
+					return "", errors.Errorf(
+						"GetString: unexpected 0 bytes after index %d of buffer of length %d: %v",
+						ndx, strByteLen, strBuf[ndx:])
+				}
+				return "", errors.Errorf(
+					"GetString: unexpected length 2 char at index %d of buffer of length %d: %s",
+					ndx, strByteLen, string(strBuf[ndx:ndx+2]))
 			}
 		} else {
 			// if an expected single-byte rune begins with
 			// 1111xxxx or 10xxxxxx then it is invalid
 			if (strBuf[ndx]&0xf0) == 0xf0 || (strBuf[ndx]&0x80) == 0x80 {
-				return "", errors.Errorf("GetString: unexpected length 1 char at index %d of buffer of length %d", ndx, strByteLen)
+				return "", errors.Errorf(
+					"GetString: unexpected length 1 char at index %d of buffer of length %d: %s",
+					ndx, strByteLen, string(strBuf[ndx:ndx+1]))
 			}
 
-			// if the first byte does not begin with any of these
-			// bit prefix sequences, it can be decoded alone
+			// if this is a zero byte, something is wrong
+			if strBuf[ndx] == 0 {
+				return "", errors.Errorf(
+					"GetString: unexpected 0 bytes after index %d of buffer of length %d: %v",
+					ndx, strByteLen, strBuf[ndx:])
+			}
+
+			// if the first byte of a group matches the bit pattern
+			// 0xxxxxxx then the group consists of just that byte
+			if (strBuf[ndx] & 0x7f) != strBuf[ndx] {
+				return "", errors.Errorf(
+					"GetString: set MSB found on expected char of length 1 at index %d of buffer of length %d",
+					ndx, strByteLen)
+			}
+
+			// this 1-byte character is well-formed
 			ch := rune(strBuf[ndx])
 			out = append(out, ch)
 			ndx++
