@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	//"github.com/elireisman/maven-index-reader-go/internal/utils"
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
 	"github.com/elireisman/maven-index-reader-go/pkg/resources"
@@ -15,10 +14,10 @@ import (
 type Index struct {
 	cfg    config.Index
 	logger *log.Logger
-	buffer chan Chunk
+	buffer chan<- string
 }
 
-func NewIndex(l *log.Logger, b chan Chunk, c config.Index) Index {
+func NewIndex(l *log.Logger, b chan<- string, c config.Index) Index {
 	l.Printf("Initializing Index reader with configuration: %+v", c)
 
 	return Index{
@@ -30,7 +29,7 @@ func NewIndex(l *log.Logger, b chan Chunk, c config.Index) Index {
 
 func (ir Index) Read() error {
 	// load remote index properties file
-	rsc, err := ir.resourceFromConfig(".properties")
+	rsc, err := resources.ConfigureResource(ir.logger, ir.cfg, ".properties")
 	if err != nil {
 		return errors.Wrap(err, "from Index#Read")
 	}
@@ -63,29 +62,36 @@ func (ir Index) Read() error {
 		return errors.Wrap(err, "from Index#Read")
 	}
 
-	targetChunks := ir.createChunksList(lastIncr)
-	ir.logger.Printf("Resolved chunk list: %v", targetChunks)
+	targetChunks := ir.createChunkSuffixList(lastIncr)
+	ir.logger.Printf("Resolved chunk suffix list: %v", targetChunks)
 
-	// TODO(eli): IMPLEMENT!
+	defer close(ir.buffer)
+	for _, chunkName := range targetChunks {
+		ir.buffer <- chunkName
+	}
 
 	return nil
 }
 
-func (ir Index) createChunksList(latestChunk int) []string {
+// resolve the list of URL or file path suffixes to be
+// applied to the base target specified in config.Index
+func (ir Index) createChunkSuffixList(latestChunk int) []string {
 	var out []string
 
 	// TODO(eli): check that NEXT (+1) CHUNK ISN'T ALSO AVAILABLE? USE HTTP HEAD REQS TO CHECK? OR TSZ + VER SCAN PER-CHUNK?
 	if ir.cfg.Mode.Incremental {
 		// assumption: this was incremented during LAST SUCCESSFUL RUN and is UNSEEN as of now!
 		prevChunk := ir.cfg.Mode.FromChunk
-		chunkPattern := ir.cfg.Source.Base + ir.cfg.Meta.Target + ".%d.gz"
+		// incremental chunk suffix is of the form ".<number>.<file_extension>"
+		incrementalChunkSuffixPattern := ".%d.gz"
 		for prevChunk <= latestChunk {
-			out = append(out, fmt.Sprintf(chunkPattern, prevChunk))
+			out = append(out, fmt.Sprintf(incrementalChunkSuffixPattern, prevChunk))
 			prevChunk++
 		}
 	} else {
-		fullIndexChunk := ir.cfg.Source.Base + ir.cfg.Meta.Target + ".gz"
-		out = append(out, fullIndexChunk)
+		// full index suffix is of the form ".<file_extension>"
+		fullIndexChunkSuffix := ".gz"
+		out = append(out, fullIndexChunkSuffix)
 	}
 
 	return out
@@ -109,24 +115,4 @@ func (ir Index) validateProperties(props data.Properties) error {
 	}
 
 	return nil
-}
-
-// resolve Resource location from config.Index supplied to readers.Index
-func (ir Index) resourceFromConfig(suffix string) (resources.Resource, error) {
-	var resource resources.Resource
-	var err error
-
-	// this can be a URL to a remote resource or a local file path
-	target := ir.cfg.Source.Base + ir.cfg.Meta.Target + suffix
-
-	switch ir.cfg.Source.Type {
-	case config.Local:
-		resource, err = resources.NewLocalResource(ir.logger, target)
-	case config.HTTP:
-		resource, err = resources.NewHttpResource(ir.logger, target)
-	default:
-		err = errors.Errorf("Index: invalid config.Index.Source.Type for target %s, got: %d", target, ir.cfg.Source.Type)
-	}
-
-	return resource, err
 }

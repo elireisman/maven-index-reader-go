@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elireisman/maven-index-reader-go/internal/utils"
+	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
 	"github.com/elireisman/maven-index-reader-go/pkg/resources"
 
@@ -14,44 +15,42 @@ import (
 )
 
 type Chunk struct {
-	logger   *log.Logger
-	resource resources.Resource
-	buffer   chan data.Record
+	suffix string
+	cfg    config.Index
+	logger *log.Logger
+	buffer chan<- data.Record
 }
 
 // NewChunk - caller supplies the input resource as well as the
 // output channel for captured records that the caller plans to consume
-func NewChunk(l *log.Logger, r resources.Resource, b chan data.Record) Chunk {
+func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, s string) Chunk {
 	return Chunk{
-		logger:   l,
-		resource: r,
-		buffer:   b,
+		suffix: s,
+		cfg:    c,
+		logger: l,
+		buffer: b,
 	}
 }
 
 // Read - initiate async consumption of Resource and population of data.Record buffer
 func (cr Chunk) Read() error {
-	if cr.resource == nil {
-		return errors.New("Chunk: cannot read from nil Resource")
-	}
-
-	rdr, err := cr.resource.Reader()
+	resource, err := resources.ConfigureResource(cr.logger, cr.cfg, cr.suffix)
+	rdr, err := resource.Reader()
 	if err != nil {
-		return errors.Wrapf(err, "Chunk: failed to obtain data stream from %s with cause", cr.resource)
+		return errors.Wrapf(err, "Chunk: failed to obtain data stream from %s with cause", resource)
 	}
+	defer resource.Close()
 
-	// TODO(eli): we may NOT need to wrap this just for chunks
 	gzRdr, err := gzip.NewReader(rdr)
 	if err != nil {
-		cr.resource.Close()
-		return errors.Wrapf(err, "Chunk: failed to wrap %s in GZIP Reader with cause", cr.resource)
+		return errors.Wrapf(err, "Chunk: failed to wrap %s in GZIP Reader with cause", resource)
 	}
+	defer gzRdr.Close()
 
 	var chunkVersion uint8
 	if b, err := utils.ReadByte(gzRdr); err == nil {
 		chunkVersion = uint8(b)
 	} else {
-		gzRdr.Close()
 		return errors.Wrap(err, "Chunk: failed to read chunk version with cause")
 	}
 
@@ -61,32 +60,18 @@ func (cr Chunk) Read() error {
 		nanos := (i64 % 1000) * 1000000
 		chunkTimestamp = time.Unix(secs, nanos)
 	} else {
-		gzRdr.Close()
 		return errors.Wrap(err, "Chunk: failed to read chunk timestamp with cause")
 	}
+	cr.logger.Printf("Chunk: found %s of version %d at time %s", resource, chunkVersion, chunkTimestamp)
 
-	// this goroutine now owns GZIP Reader and must close it
-	cr.logger.Printf("Chunk: found %s of version %d at time %s", cr.resource, chunkVersion, chunkTimestamp)
-	go cr.recordIterator(gzRdr, chunkVersion, chunkTimestamp)
-
-	return nil
-}
-
-func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTimestamp time.Time) {
-	defer func() {
-		gzRdr.Close()
-		close(cr.buffer)
-	}()
-
-	var err error
 	count := 1
 	for {
 		var fieldCount int32
 		fieldCount, err = utils.ReadInt32(gzRdr)
 		if err != nil {
-			cr.logger.Panicf(
-				"Chunk: failed to read field count for record %d from %s with cause: %s",
-				count, cr.resource, err)
+			return errors.Wrapf(err,
+				"Chunk: failed to read field count for record %d from %s with cause",
+				count, resource)
 		}
 
 		rawRecord := map[string]string{}
@@ -94,9 +79,9 @@ func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTim
 			// we ignore each Record's 1 byte of index bit flags
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
-				cr.logger.Panicf(
-					"Chunk: failed to read field flags for record %d from %s with cause: %s",
-					count, cr.resource, err)
+				return errors.Wrapf(err,
+					"Chunk: failed to read field flags for record %d from %s with cause",
+					count, resource)
 			}
 
 			// a Record's *key* conforms to standard Java "readUTF" behavior
@@ -104,9 +89,9 @@ func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTim
 			var key string
 			key, err = utils.ReadString(gzRdr)
 			if err != nil {
-				cr.logger.Panicf(
-					"Chunk: failed to read field key for record %d from %s with cause: %s",
-					count, cr.resource, err)
+				return errors.Wrapf(err,
+					"Chunk: failed to read field key for record %d from %s with cause",
+					count, resource)
 			}
 
 			// a Record's *value* can be larger; the size field is 4 bytes (int32)
@@ -115,9 +100,9 @@ func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTim
 			var value string
 			value, err = utils.ReadLargeString(gzRdr)
 			if err != nil && errors.Cause(err) != io.EOF {
-				cr.logger.Panicf(
-					"Chunk: failed to read field value for key %s on record %d from %s with cause: %s",
-					key, count, cr.resource, err)
+				return errors.Wrapf(err,
+					"Chunk: failed to read field value for key %s on record %d from %s with cause",
+					key, count, resource)
 			}
 
 			rawRecord[key] = value
@@ -127,21 +112,21 @@ func (cr Chunk) recordIterator(gzRdr io.ReadCloser, chunkVersion uint8, chunkTim
 		if isSkippableRecordType(record) {
 			cr.logger.Printf("Chunk: skipped Record by type %+v", record)
 			if errors.Cause(err) == io.EOF {
-				return
+				return nil
 			}
 			continue
 		}
 		if rErr != nil {
 			cr.logger.Panicf(
 				"Chunk: failed to compose well-formed record %d from %s from %s with cause: %s (at EOF: %t)",
-				count, rawRecord, cr.resource, rErr, errors.Cause(err) == io.EOF)
+				count, rawRecord, resource, rErr, errors.Cause(err) == io.EOF)
 		}
 
 		cr.buffer <- record
 
 		if errors.Cause(err) == io.EOF {
-			cr.logger.Printf("Chunk: successfully published %d records from %s", count, cr.resource)
-			return
+			cr.logger.Printf("Chunk: successfully published %d records from %s", count, resource)
+			return nil
 		}
 		count++
 	}

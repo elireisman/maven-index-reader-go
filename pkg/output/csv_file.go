@@ -25,24 +25,30 @@ type CSV struct {
 	input    <-chan data.Record
 }
 
-func NewCSV(l *log.Logger, fp string, in <-chan data.Record) CSV {
+func NewCSV(l *log.Logger, in <-chan data.Record, fp string) CSV {
 	return CSV{l, fp, in}
 }
 
 func (c CSV) Write() error {
-	path := filepath.Dir(c.filePath)
-	err := os.MkdirAll(path, 0755)
-	if err != nil {
-		return errors.Wrapf(err, "JSON: failed to create output directory at %s with cause", path)
-	}
+	// TODO(eli): yuck! all this is terrible revisit the pattern, pass the writer in!
+	var w *bufio.Writer
+	if len(c.filePath) > 0 {
+		path := filepath.Dir(c.filePath)
+		err := os.MkdirAll(path, 0755)
+		if err != nil {
+			return errors.Wrapf(err, "JSON: failed to create output directory at %s with cause", path)
+		}
 
-	f, err := os.Create(c.filePath)
-	if err != nil {
-		return errors.Wrapf(err, "CSV: failed to create output file at %s with cause", c.filePath)
-	}
-	defer f.Close()
+		f, err := os.Create(c.filePath)
+		if err != nil {
+			return errors.Wrapf(err, "CSV: failed to create output file at %s with cause", c.filePath)
+		}
+		defer f.Close()
 
-	w := bufio.NewWriter(f)
+		w = bufio.NewWriter(f)
+	} else {
+		w = bufio.NewWriter(os.Stdout)
+	}
 	defer w.Flush()
 
 	count := 0
