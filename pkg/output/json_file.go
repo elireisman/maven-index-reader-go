@@ -23,7 +23,6 @@ func NewJSON(l *log.Logger, in <-chan data.Record, fp string) JSON {
 }
 
 func (j JSON) Write() error {
-	// TODO(eli): yuck! all this is terrible revisit the pattern, pass the writer in!
 	var w *bufio.Writer
 	if len(j.filePath) > 0 {
 		path := filepath.Dir(j.filePath)
@@ -54,6 +53,9 @@ func (j JSON) Write() error {
 		if count > 0 {
 			w.WriteString(",\n")
 		}
+
+		// inject record's RecordType into payload prior to JSON  serialization
+		record.Payload()["recordType"] = data.RecordTypeNames[record.Type()]
 
 		out, err := json.Marshal(record.Payload())
 		if err != nil {

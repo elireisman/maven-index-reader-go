@@ -22,6 +22,14 @@ const (
 	RootGroups
 )
 
+var RecordTypeNames = map[RecordType]string{
+	Descriptor:     "descriptor",
+	ArtifactAdd:    "artifact_add",
+	ArtifactRemove: "artifact_remove",
+	AllGroups:      "all_groups",
+	RootGroups:     "root_groups",
+}
+
 const (
 	// Raw key on "ARTIFACT_ADD" type Records
 	UInfoKey = "u"

@@ -59,12 +59,15 @@ func (c CSV) Write() error {
 		if !headersWritten {
 			// ordered array or strings
 			keys := record.Keys()
-			_, err := w.WriteString(strings.Join(keys, ",") + "\n")
+			_, err := w.WriteString("record_type," + strings.Join(keys, ",") + "\n")
 			if err != nil {
 				return errors.Wrapf(err, "CSV: failed to write headers to file %s with cause", c.filePath)
 			}
 			headersWritten = true
 		}
+
+		// append data.Record's RecordType as 1st value
+		values = append(values, data.RecordTypeNames[record.Type()])
 
 		for i := 0; i < len(record.Keys()); i++ {
 			key := record.Keys()[i]
