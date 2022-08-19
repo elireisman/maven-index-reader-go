@@ -65,19 +65,11 @@ func main() {
 	// make a queue to buffer records scanned from
 	// the various index chunks, and pass it to an
 	// output formatter according to CLI args
-	outputQueue := make(chan data.Record, 64)
-	var out output.Output
-	switch OutMode {
-	case "json":
-		out = output.NewJSON(logger, outputQueue, OutFile)
-	case "csv":
-		out = output.NewCSV(logger, outputQueue, OutFile)
-	default:
-		// TODO(eli): eliminate this - redundant! for debug: prints Go structs to stdout
-		out = output.NewLogger(logger, outputQueue)
+	records := make(chan data.Record, 64)
+	out, err := output.ResolveFormat(logger, records, OutMode, OutFile)
+	if err != nil {
+		panic(err.Error())
 	}
-
-	// TODO(eli): MOVE MOST OF THE BELOW INTO readers.Index ?!?
 
 	// set up a fixed-size worker pool and feed resolved
 	// chunks to be scanned into the pool
@@ -87,14 +79,14 @@ func main() {
 		target := chunkName
 		wg.Add(1)
 
-		chunkWorkerPool <- struct{}{}
 		go func() {
 			defer func() {
 				<-chunkWorkerPool
 				wg.Done()
 			}()
 
-			chunk := readers.NewChunk(logger, outputQueue, mavenCentralCfg, target)
+			chunkWorkerPool <- struct{}{}
+			chunk := readers.NewChunk(logger, records, mavenCentralCfg, target)
 			if err := chunk.Read(); err != nil {
 				if errors.Cause(err) == io.EOF {
 					logger.Printf("Chunk: EOF encountered for chunk: %s", target)
@@ -110,7 +102,7 @@ func main() {
 	// will trigger the output formatter to complete and clean up.
 	go func() {
 		wg.Wait()
-		close(outputQueue)
+		close(records)
 	}()
 
 	if err := out.Write(); err != nil {

@@ -18,8 +18,8 @@ type JSON struct {
 	input    <-chan data.Record
 }
 
-func NewJSON(l *log.Logger, in <-chan data.Record, fp string) CSV {
-	return CSV{l, fp, in}
+func NewJSON(l *log.Logger, in <-chan data.Record, fp string) JSON {
+	return JSON{l, fp, in}
 }
 
 func (j JSON) Write() error {
