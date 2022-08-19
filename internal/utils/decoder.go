@@ -12,7 +12,7 @@ import (
 // See DataInput#readUTF: https://docs.oracle.com/javase/6/docs/api/java/io/DataInput.html#readUTF%28%29
 func GetString(strBuf []byte) (string, error) {
 	// parse "Java modified UTF-8" encoding from byte buffer of expected length
-	ndx := 0
+	var ndx int
 	strByteLen := len(strBuf)
 	var out []rune
 	for ndx < strByteLen {

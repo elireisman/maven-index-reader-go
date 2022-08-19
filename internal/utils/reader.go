@@ -31,15 +31,20 @@ func ReadLargeString(r io.Reader) (string, error) {
 // read a variable-length string in "Java modified UTF-8" encoding
 func readUTF8String(r io.Reader, strByteLen int) (string, error) {
 	// read the expected string's buffer length in bytes from input stream
-	strBuf := make([]byte, strByteLen)
-	n, err := r.Read(strBuf)
-	if err != nil && err != io.EOF {
-		return "", errors.Wrapf(err, "readUTF8String: failed to read expected buffer of size %d (got %d) with cause", strByteLen, n)
+	var bytesRead int
+	var err error
+	var strBuf = make([]byte, strByteLen)
+
+	for bytesRead < strByteLen {
+		var n int
+		n, err = r.Read(strBuf[bytesRead:])
+		bytesRead += n
+		if err != nil && errors.Cause(err) != io.EOF {
+			return "", errors.Wrapf(err,
+				"readUTF8String: failed to read expected buffer of size %d (got %d) with cause",
+				strByteLen, bytesRead)
+		}
 	}
-	if n < strByteLen {
-		return "", errors.Errorf("readUTF8String: only read %d bytes of expected %d got: %v", n, strByteLen, strBuf)
-	}
-	// TODO(eli): while next byte == 0, do: `b := [1]byte{}; r.Read(b[:])` to flush buffer to (strByteLen - n) ???
 
 	// parse the buffer into std UTF-8. if no parse error,
 	// conserve possible reader io.EOF for caller
@@ -59,13 +64,21 @@ func ReadByte(r io.Reader) (byte, error) {
 
 // ReadUint16 -
 func ReadUint16(r io.Reader) (uint16, error) {
+	var bytesRead int
+	var err error
 	var arr [2]byte
-	n, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
+
+	for bytesRead < 2 {
+		var n int
+		n, err = r.Read(arr[bytesRead:])
+		bytesRead += n
+		if err != nil && errors.Cause(err) != io.EOF {
+			return 0, err
+		}
 	}
-	if n != 2 {
-		return 0, errors.Errorf("GetUint16: expected to read 2 bytes, got: %d", n)
+
+	if bytesRead != 2 && errors.Cause(err) != io.EOF {
+		return 0, errors.Errorf("ReadUint16: expected to read 2 bytes, got: %d", bytesRead)
 	}
 
 	// if no parse error, conserve possible reader io.EOF for caller
@@ -75,13 +88,21 @@ func ReadUint16(r io.Reader) (uint16, error) {
 
 // ReadInt32 -
 func ReadInt32(r io.Reader) (int32, error) {
+	var bytesRead int
+	var err error
 	var arr [4]byte
-	n, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
+
+	for bytesRead < 4 {
+		var n int
+		n, err = r.Read(arr[bytesRead:])
+		bytesRead += n
+		if err != nil && errors.Cause(err) != io.EOF {
+			return 0, err
+		}
 	}
-	if n != 4 {
-		return 0, errors.Errorf("GetUint16: expected to read 4 bytes, got: %d", n)
+
+	if bytesRead != 4 && errors.Cause(err) != io.EOF {
+		return 0, errors.Errorf("ReadInt32: expected to read 4 bytes, got: %d", bytesRead)
 	}
 
 	// if no parse error, conserve possible reader io.EOF for caller
@@ -91,13 +112,21 @@ func ReadInt32(r io.Reader) (int32, error) {
 
 // ReadInt64 -
 func ReadInt64(r io.Reader) (int64, error) {
+	var bytesRead int
+	var err error
 	var arr [8]byte
-	n, err := r.Read(arr[:])
-	if err != nil && err != io.EOF {
-		return 0, err
+
+	for bytesRead < 8 {
+		var n int
+		n, err = r.Read(arr[bytesRead:])
+		bytesRead += n
+		if err != nil && errors.Cause(err) != io.EOF {
+			return 0, err
+		}
 	}
-	if n != 8 {
-		return 0, errors.Errorf("GetUint16: expected to read 8 bytes, got: %d", n)
+
+	if bytesRead != 8 && errors.Cause(err) != io.EOF {
+		return 0, errors.Errorf("ReadInt64: expected to read 8 bytes, got: %d", bytesRead)
 	}
 
 	// if no parse error, conserve possible reader io.EOF for caller
@@ -107,7 +136,7 @@ func ReadInt64(r io.Reader) (int64, error) {
 // ReadTimestamp -
 func ReadTimestamp(r io.Reader) (time.Time, error) {
 	timeStr, err := ReadString(r)
-	if err != nil && err != io.EOF {
+	if err != nil && errors.Cause(err) != io.EOF {
 		return time.Now().UTC(), errors.Wrap(err, "ReadTimestamp: failed to obtain string from decoder with cause")
 	}
 

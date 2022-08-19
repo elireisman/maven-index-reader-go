@@ -86,8 +86,7 @@ func (cr Chunk) Read() error {
 
 			// a Record's *key* conforms to standard Java "readUTF" behavior
 			// including a max size field of 2 bytes (uint16)
-			var key string
-			key, err = utils.ReadString(gzRdr)
+			key, err := utils.ReadString(gzRdr)
 			if err != nil {
 				return errors.Wrapf(err,
 					"Chunk: failed to read field key for record %d from %s with cause",
@@ -97,9 +96,8 @@ func (cr Chunk) Read() error {
 			// a Record's *value* can be larger; the size field is 4 bytes (int32)
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L189
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L196
-			var value string
-			value, err = utils.ReadLargeString(gzRdr)
-			if err != nil && errors.Cause(err) != io.EOF {
+			value, err := utils.ReadLargeString(gzRdr)
+			if err != nil {
 				return errors.Wrapf(err,
 					"Chunk: failed to read field value for key %s on record %d from %s with cause",
 					key, count, resource)

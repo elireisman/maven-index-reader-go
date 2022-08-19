@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"sync"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
 	"github.com/elireisman/maven-index-reader-go/pkg/output"
 	"github.com/elireisman/maven-index-reader-go/pkg/readers"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -90,6 +93,10 @@ func main() {
 
 			chunk := readers.NewChunk(logger, outputQueue, mavenCentralCfg, suffix)
 			if err := chunk.Read(); err != nil {
+				if errors.Cause(err) == io.EOF {
+					logger.Printf("Chunk: EOF encountered for chunk: %s", suffix)
+					return
+				}
 				logger.Panicf(err.Error())
 			}
 		}()
