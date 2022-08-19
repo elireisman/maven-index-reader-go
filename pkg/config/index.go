@@ -1,6 +1,32 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
+
+// Validate - the beginnings of a config.Index validator :)
+func Validate(logger *log.Logger, cfg Index) error {
+	logger.Printf("Resolved configuration: %+v\n", cfg)
+
+	if len(cfg.Meta.File) == 0 {
+		return fmt.Errorf("Invalid configuration: index base file name (Meta.File) is required")
+	}
+	if len(cfg.Meta.ID) == 0 {
+		return fmt.Errorf("Invalid configuration: index identifier (Meta.ID) is required")
+	}
+	if len(cfg.Meta.ChainID) == 0 {
+		return fmt.Errorf("Invalid configuration: index chain ID (Meta.ChainID) is required")
+	}
+	if len(cfg.Source.Base) == 0 {
+		return fmt.Errorf("Invalid configuration: index base URL (Source.Base) is required")
+	}
+	if cfg.Source.Type != Local && cfg.Source.Type != HTTP {
+		return fmt.Errorf("Invalid configuration: index location (Source.Type) is required")
+	}
+
+	return nil
+}
 
 // configuration for an readers.IndexReader
 type Index struct {
@@ -11,19 +37,22 @@ type Index struct {
 
 // Resolve the full Resource target string from supplied config.Index and args
 func (cfg Index) ResolveTarget(targetOrPattern string, targetArgs ...interface{}) string {
-	return cfg.Source.Base + cfg.Meta.Target + fmt.Sprintf(targetOrPattern, targetArgs...)
+	return cfg.Source.Base + cfg.Meta.File + fmt.Sprintf(targetOrPattern, targetArgs...)
 }
 
 type Meta struct {
 	ID      string // expected index ID, as in "nexus.index.id"
 	ChainID string // expected chain ID, as in "nexus.index.chain-id"
-	Target  string // expected base name of source index resources like "nexus-maven-repository-index"
+	File    string // expected base name of source index resources like "nexus-maven-repository-index"
 }
 
 type Mode struct {
-	Incremental bool
-	FromChunk   int // fetch all available chunks with this ID and higher
+	FromChunk int // fetch all available chunks with this ID and higher
 	//FromTime    time.Time // fetch all available chunks with this timestamp or more recent
+}
+
+func (m Mode) IsIncrementalRun() bool {
+	return m.FromChunk > 0
 }
 
 type Source struct {

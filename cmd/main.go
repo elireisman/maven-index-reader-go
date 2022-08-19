@@ -25,8 +25,7 @@ var (
 func init() {
 	flag.StringVar(&OutMode, "out-mode", "log", "one of 'log', 'json', 'csv'")
 	flag.StringVar(&OutFile, "out-file", "", "if set, specifies the target output file or path. Depends on --out-mode")
-	flag.BoolVar(&Incremental, "incremental", false, "if set, perform an incremental read only, rather than full index")
-	flag.IntVar(&From, "from", 0, "update from the provided chunk ID to most recent, only. Depends on --incremental")
+	flag.IntVar(&From, "from", 0, "if non-zero, only process index chunk updates from the provided chunk ID to most recent")
 	flag.IntVar(&Concurrency, "concurrency", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
 
@@ -34,20 +33,24 @@ func main() {
 	flag.Parse()
 
 	logger := log.Default()
+
 	mavenCentralCfg := config.Index{
 		Meta: config.Meta{
+			// from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
 			ID:      "central",
-			ChainID: "1318453614498", // from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
-			Target:  "nexus-maven-repository-index",
+			ChainID: "1318453614498",
+			File:    "nexus-maven-repository-index",
 		},
 		Source: config.Source{
 			Base: "https://repo1.maven.org/maven2/.index/",
 			Type: config.HTTP,
 		},
 		Mode: config.Mode{
-			Incremental: true,
-			FromChunk:   768, // resolves to https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.768.gz
+			FromChunk: From,
 		},
+	}
+	if err := config.Validate(logger, mavenCentralCfg); err != nil {
+		panic(err.Error())
 	}
 
 	// Fetch index properties and enumerate index chunks to be scanned
@@ -80,8 +83,8 @@ func main() {
 	// chunks to be scanned into the pool
 	var wg sync.WaitGroup
 	chunkWorkerPool := make(chan struct{}, Concurrency)
-	for chunkNameSuffix := range chunkNamesQueue {
-		suffix := chunkNameSuffix
+	for chunkName := range chunkNamesQueue {
+		target := chunkName
 		wg.Add(1)
 
 		chunkWorkerPool <- struct{}{}
@@ -91,10 +94,10 @@ func main() {
 				wg.Done()
 			}()
 
-			chunk := readers.NewChunk(logger, outputQueue, mavenCentralCfg, suffix)
+			chunk := readers.NewChunk(logger, outputQueue, mavenCentralCfg, target)
 			if err := chunk.Read(); err != nil {
 				if errors.Cause(err) == io.EOF {
-					logger.Printf("Chunk: EOF encountered for chunk: %s", suffix)
+					logger.Printf("Chunk: EOF encountered for chunk: %s", target)
 					return
 				}
 				logger.Panicf(err.Error())

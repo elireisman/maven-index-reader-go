@@ -62,8 +62,8 @@ func (ir Index) Read() error {
 		return errors.Wrap(err, "from Index#Read")
 	}
 
-	targetChunks := ir.createChunkSuffixList(lastIncr)
-	ir.logger.Printf("Resolved chunk suffix list: %v", targetChunks)
+	targetChunks := ir.enumerateIndexChunks(lastIncr)
+	ir.logger.Printf("Resolved index chunk target list: %v", targetChunks)
 
 	defer close(ir.buffer)
 	for _, chunkName := range targetChunks {
@@ -75,12 +75,13 @@ func (ir Index) Read() error {
 
 // resolve the list of URL or file path suffixes to be
 // applied to the base target specified in config.Index
-func (ir Index) createChunkSuffixList(latestChunk int) []string {
+func (ir Index) enumerateIndexChunks(latestChunk int) []string {
 	var out []string
 
 	// TODO(eli): check that NEXT (+1) CHUNK ISN'T ALSO AVAILABLE? USE HTTP HEAD REQS TO CHECK? OR TSZ + VER SCAN PER-CHUNK?
-	if ir.cfg.Mode.Incremental {
-		// assumption: this was incremented during LAST SUCCESSFUL RUN and is UNSEEN as of now!
+	if ir.cfg.Mode.IsIncrementalRun() {
+		// assumption: this value was incremented at the end of the last
+		// successful run, and has not been successfully consumed yet
 		prevChunk := ir.cfg.Mode.FromChunk
 
 		// incremental chunk suffix is of the form ".<number>.<file_extension>"
