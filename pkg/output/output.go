@@ -2,11 +2,9 @@ package output
 
 import (
 	"log"
-	"strings"
 
+	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
-
-	"github.com/pkg/errors"
 )
 
 // Format - contract for supported ouput formats
@@ -15,17 +13,17 @@ type Format interface {
 }
 
 // ResolveFormat -
-func ResolveFormat(logger *log.Logger, queue <-chan data.Record, specifier, filePath string) (Format, error) {
-	switch strings.ToLower(specifier) {
-	case "json":
-		return NewJSON(logger, queue, filePath), nil
-	case "csv":
-		return NewCSV(logger, queue, filePath), nil
-	case "log":
-		return NewLogger(logger, queue), nil
-	default:
-		// fall through
+func ResolveFormat(logger *log.Logger, queue <-chan data.Record, cfg config.Index) Format {
+	var out Format
+
+	switch cfg.Output.Format {
+	case config.JSON:
+		out = NewJSON(logger, queue, cfg)
+	case config.CSV:
+		out = NewCSV(logger, queue, cfg)
+	default: // log unformatted Go structs
+		out = NewLogger(logger, queue, cfg)
 	}
 
-	return nil, errors.Errorf("invalid output format: %s", specifier)
+	return out
 }

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
 
 	"github.com/pkg/errors"
@@ -20,28 +21,28 @@ var (
 )
 
 type CSV struct {
-	logger   *log.Logger
-	filePath string
-	input    <-chan data.Record
+	logger *log.Logger
+	cfg    config.Index
+	input  <-chan data.Record
 }
 
-func NewCSV(l *log.Logger, in <-chan data.Record, fp string) CSV {
-	return CSV{l, fp, in}
+func NewCSV(l *log.Logger, in <-chan data.Record, c config.Index) CSV {
+	l.Printf("Output: formatting data.Records as CSV...\n")
+	return CSV{l, c, in}
 }
 
 func (c CSV) Write() error {
-	// TODO(eli): yuck! all this is terrible revisit the pattern, pass the writer in!
 	var w *bufio.Writer
-	if len(c.filePath) > 0 {
-		path := filepath.Dir(c.filePath)
+	if len(c.cfg.Output.File) > 0 {
+		path := filepath.Dir(c.cfg.Output.File)
 		err := os.MkdirAll(path, 0755)
 		if err != nil {
-			return errors.Wrapf(err, "JSON: failed to create output directory at %s with cause", path)
+			return errors.Wrapf(err, "CSV: failed to create output directory at %s with cause", path)
 		}
 
-		f, err := os.Create(c.filePath)
+		f, err := os.Create(c.cfg.Output.File)
 		if err != nil {
-			return errors.Wrapf(err, "CSV: failed to create output file at %s with cause", c.filePath)
+			return errors.Wrapf(err, "CSV: failed to create output file at %s with cause", c.cfg.Output.File)
 		}
 		defer f.Close()
 
@@ -61,7 +62,7 @@ func (c CSV) Write() error {
 			keys := record.Keys()
 			_, err := w.WriteString("record_type," + strings.Join(keys, ",") + "\n")
 			if err != nil {
-				return errors.Wrapf(err, "CSV: failed to write headers to file %s with cause", c.filePath)
+				return errors.Wrapf(err, "CSV: failed to write headers to file %s with cause", c.cfg.Output.File)
 			}
 			headersWritten = true
 		}
@@ -91,7 +92,7 @@ func (c CSV) Write() error {
 		count++
 	}
 
-	c.logger.Printf("CSV: successfully persisted %d records to file %s", count, c.filePath)
+	c.logger.Printf("CSV: successfully persisted %d records to file %s", count, c.cfg.Output.File)
 	return nil
 }
 

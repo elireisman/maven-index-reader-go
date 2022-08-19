@@ -64,7 +64,7 @@ func (pr PropertiesReader) Read() (data.Properties, error) {
 
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
-		pr.logger.Printf("%16s => %24s", key, value)
+		//pr.logger.Printf("%16s => %24s", key, value)
 		out[key] = value
 	}
 

@@ -24,6 +24,9 @@ func Validate(logger *log.Logger, cfg Index) error {
 	if cfg.Source.Type != Local && cfg.Source.Type != HTTP {
 		return fmt.Errorf("Invalid configuration: index location (Source.Type) is required")
 	}
+	if cfg.Output.Format != Log && cfg.Output.Format != CSV && cfg.Output.Format != JSON {
+		return fmt.Errorf("Invalid configuration: valid format type (Output.Format) is required")
+	}
 
 	return nil
 }
@@ -33,6 +36,7 @@ type Index struct {
 	Meta   Meta
 	Source Source
 	Mode   Mode
+	Output Output
 }
 
 // Resolve the full Resource target string from supplied config.Index and args
@@ -63,7 +67,27 @@ type Source struct {
 type SourceType uint8
 
 const (
-	Unknown SourceType = iota
+	UnknownSource SourceType = iota
 	Local
 	HTTP
 )
+
+type Output struct {
+	Format OutputType
+	File   string // defaults to os.Stdout if undefined
+}
+
+type OutputType uint8
+
+const (
+	UnknownOuput OutputType = iota
+	Log
+	CSV
+	JSON
+)
+
+var OutputFormats = map[string]OutputType{
+	"log":  Log,
+	"csv":  CSV,
+	"json": JSON,
+}

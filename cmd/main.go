@@ -15,16 +15,16 @@ import (
 )
 
 var (
-	OutMode     string
-	OutFile     string
+	Format      string
+	Dest        string
 	Incremental bool
 	From        int
 	Concurrency int
 )
 
 func init() {
-	flag.StringVar(&OutMode, "out-mode", "log", "one of 'log', 'json', 'csv'")
-	flag.StringVar(&OutFile, "out-file", "", "if set, specifies the target output file or path. Depends on --out-mode")
+	flag.StringVar(&Format, "format", "log", "output format: one of 'log', 'json', 'csv'")
+	flag.StringVar(&Dest, "dest", "", "if set, specifies the target output file or path. stdout if unset")
 	flag.IntVar(&From, "from", 0, "if non-zero, only process index chunk updates from the provided chunk ID to most recent")
 	flag.IntVar(&Concurrency, "concurrency", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
@@ -48,6 +48,10 @@ func main() {
 		Mode: config.Mode{
 			FromChunk: From,
 		},
+		Output: config.Output{
+			Format: config.OutputFormats[Format],
+			File:   Dest,
+		},
 	}
 	if err := config.Validate(logger, mavenCentralCfg); err != nil {
 		panic(err.Error())
@@ -66,10 +70,7 @@ func main() {
 	// the various index chunks, and pass it to an
 	// output formatter according to CLI args
 	records := make(chan data.Record, 64)
-	out, err := output.ResolveFormat(logger, records, OutMode, OutFile)
-	if err != nil {
-		panic(err.Error())
-	}
+	out := output.ResolveFormat(logger, records, mavenCentralCfg)
 
 	// set up a fixed-size worker pool and feed resolved
 	// chunks to be scanned into the pool

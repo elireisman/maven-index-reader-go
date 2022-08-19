@@ -17,8 +17,7 @@ type Index struct {
 }
 
 func NewIndex(l *log.Logger, b chan<- string, c config.Index) Index {
-	l.Printf("Initializing Index reader with configuration: %+v", c)
-
+	l.Printf("Initializing Index reader")
 	return Index{
 		cfg:    c,
 		logger: l,
@@ -49,7 +48,7 @@ func (ir Index) Read() error {
 	if err != nil {
 		return errors.Wrap(err, "from Index#Read")
 	}
-	ir.logger.Printf("Resolved Nexus timestamp: %s\n", tsz)
+	ir.logger.Printf("Resolved Nexus timestamp: %s", tsz)
 
 	lastIncr, err := props.GetAsInt("nexus.index.last-incremental")
 	if err != nil {
