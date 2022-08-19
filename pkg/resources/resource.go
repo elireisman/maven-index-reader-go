@@ -19,12 +19,9 @@ type Resource interface {
 }
 
 // resolve a Resource from caller-supplied config.Index
-func ConfigureResource(logger *log.Logger, cfg config.Index, targetSuffix string) (Resource, error) {
+func FromConfig(logger *log.Logger, cfg config.Index, target string) (Resource, error) {
 	var resource Resource
 	var err error
-
-	// this can be a URL to a remote resource or a local file path
-	target := cfg.Source.Base + cfg.Meta.Target + targetSuffix
 
 	switch cfg.Source.Type {
 	case config.Local:

@@ -1,10 +1,17 @@
 package config
 
+import "fmt"
+
 // configuration for an readers.IndexReader
 type Index struct {
 	Meta   Meta
 	Source Source
 	Mode   Mode
+}
+
+// Resolve the full Resource target string from supplied config.Index and args
+func (cfg Index) ResolveTarget(targetOrPattern string, targetArgs ...interface{}) string {
+	return cfg.Source.Base + cfg.Meta.Target + fmt.Sprintf(targetOrPattern, targetArgs...)
 }
 
 type Meta struct {

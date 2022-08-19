@@ -46,7 +46,7 @@ func main() {
 		},
 		Mode: config.Mode{
 			Incremental: true,
-			FromChunk:   767, // resolves to https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.767.gz
+			FromChunk:   768, // resolves to https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.768.gz
 		},
 	}
 

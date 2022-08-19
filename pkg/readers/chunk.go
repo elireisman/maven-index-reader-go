@@ -15,7 +15,7 @@ import (
 )
 
 type Chunk struct {
-	suffix string
+	target string
 	cfg    config.Index
 	logger *log.Logger
 	buffer chan<- data.Record
@@ -23,9 +23,9 @@ type Chunk struct {
 
 // NewChunk - caller supplies the input resource as well as the
 // output channel for captured records that the caller plans to consume
-func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, s string) Chunk {
+func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, t string) Chunk {
 	return Chunk{
-		suffix: s,
+		target: t,
 		cfg:    c,
 		logger: l,
 		buffer: b,
@@ -34,7 +34,7 @@ func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, s string) Chu
 
 // Read - initiate async consumption of Resource and population of data.Record buffer
 func (cr Chunk) Read() error {
-	resource, err := resources.ConfigureResource(cr.logger, cr.cfg, cr.suffix)
+	resource, err := resources.FromConfig(cr.logger, cr.cfg, cr.target)
 	rdr, err := resource.Reader()
 	if err != nil {
 		return errors.Wrapf(err, "Chunk: failed to obtain data stream from %s with cause", resource)
@@ -51,7 +51,7 @@ func (cr Chunk) Read() error {
 	if b, err := utils.ReadByte(gzRdr); err == nil {
 		chunkVersion = uint8(b)
 	} else {
-		return errors.Wrap(err, "Chunk: failed to read chunk version with cause")
+		return errors.Wrapf(err, "Chunk(%s): failed to read chunk version with cause", cr.target)
 	}
 
 	var chunkTimestamp time.Time
@@ -60,9 +60,9 @@ func (cr Chunk) Read() error {
 		nanos := (i64 % 1000) * 1000000
 		chunkTimestamp = time.Unix(secs, nanos)
 	} else {
-		return errors.Wrap(err, "Chunk: failed to read chunk timestamp with cause")
+		return errors.Wrapf(err, "Chunk(%s): failed to read chunk timestamp with cause", cr.target)
 	}
-	cr.logger.Printf("Chunk: found %s of version %d at time %s", resource, chunkVersion, chunkTimestamp)
+	cr.logger.Printf("Chunk(%s): version %d at time %s", cr.target, chunkVersion, chunkTimestamp)
 
 	count := 1
 	for {
@@ -70,8 +70,8 @@ func (cr Chunk) Read() error {
 		fieldCount, err = utils.ReadInt32(gzRdr)
 		if err != nil {
 			return errors.Wrapf(err,
-				"Chunk: failed to read field count for record %d from %s with cause",
-				count, resource)
+				"Chunk(%s): failed to read field count for record %d with cause",
+				cr.target, count)
 		}
 
 		rawRecord := map[string]string{}
@@ -80,8 +80,8 @@ func (cr Chunk) Read() error {
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
 				return errors.Wrapf(err,
-					"Chunk: failed to read field flags for record %d from %s with cause",
-					count, resource)
+					"Chunk(%s): failed to read field flags for record %d with cause",
+					cr.target, count)
 			}
 
 			// a Record's *key* conforms to standard Java "readUTF" behavior
@@ -89,8 +89,8 @@ func (cr Chunk) Read() error {
 			key, err := utils.ReadString(gzRdr)
 			if err != nil {
 				return errors.Wrapf(err,
-					"Chunk: failed to read field key for record %d from %s with cause",
-					count, resource)
+					"Chunk(%s): failed to read field key for record %d with cause",
+					cr.target, count)
 			}
 
 			// a Record's *value* can be larger; the size field is 4 bytes (int32)
@@ -99,8 +99,8 @@ func (cr Chunk) Read() error {
 			value, err := utils.ReadLargeString(gzRdr)
 			if err != nil {
 				return errors.Wrapf(err,
-					"Chunk: failed to read field value for key %s on record %d from %s with cause",
-					key, count, resource)
+					"Chunk(%s): failed to read field value for key %s on record %d with cause",
+					cr.target, key, count)
 			}
 
 			rawRecord[key] = value
@@ -108,7 +108,7 @@ func (cr Chunk) Read() error {
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
 		if isSkippableRecordType(record) {
-			cr.logger.Printf("Chunk: skipped Record by type %+v", record)
+			cr.logger.Printf("Chunk(%s): skipped Record by type %+v", cr.target, record)
 			if errors.Cause(err) == io.EOF {
 				return nil
 			}
@@ -116,8 +116,8 @@ func (cr Chunk) Read() error {
 		}
 		if rErr != nil {
 			cr.logger.Panicf(
-				"Chunk: failed to compose well-formed record %d from %s from %s with cause: %s (at EOF: %t)",
-				count, rawRecord, resource, rErr, errors.Cause(err) == io.EOF)
+				"Chunk(%s): failed to compose well-formed record %d from %s with cause: %s",
+				cr.target, count, rawRecord, rErr)
 		}
 
 		cr.buffer <- record

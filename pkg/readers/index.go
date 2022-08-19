@@ -1,7 +1,6 @@
 package readers
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
@@ -29,7 +28,8 @@ func NewIndex(l *log.Logger, b chan<- string, c config.Index) Index {
 
 func (ir Index) Read() error {
 	// load remote index properties file
-	rsc, err := resources.ConfigureResource(ir.logger, ir.cfg, ".properties")
+	target := ir.cfg.ResolveTarget(".properties")
+	rsc, err := resources.FromConfig(ir.logger, ir.cfg, target)
 	if err != nil {
 		return errors.Wrap(err, "from Index#Read")
 	}
@@ -82,16 +82,15 @@ func (ir Index) createChunkSuffixList(latestChunk int) []string {
 	if ir.cfg.Mode.Incremental {
 		// assumption: this was incremented during LAST SUCCESSFUL RUN and is UNSEEN as of now!
 		prevChunk := ir.cfg.Mode.FromChunk
+
 		// incremental chunk suffix is of the form ".<number>.<file_extension>"
-		incrementalChunkSuffixPattern := ".%d.gz"
 		for prevChunk <= latestChunk {
-			out = append(out, fmt.Sprintf(incrementalChunkSuffixPattern, prevChunk))
+			out = append(out, ir.cfg.ResolveTarget(".%d.gz", prevChunk))
 			prevChunk++
 		}
 	} else {
 		// full index suffix is of the form ".<file_extension>"
-		fullIndexChunkSuffix := ".gz"
-		out = append(out, fullIndexChunkSuffix)
+		out = append(out, ir.cfg.ResolveTarget(".gz"))
 	}
 
 	return out
