@@ -60,7 +60,7 @@ func (hr *httpResource) Reader() (io.Reader, error) {
 	}
 
 	// this Resource's owner now bears responsibility to call Close
-	hr.reader = resp.Body // TODO(eli): do we need explicit gzip.NewReader(body) here?
+	hr.reader = resp.Body
 	return hr.reader, nil
 }
 
