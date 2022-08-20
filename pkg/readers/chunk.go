@@ -35,11 +35,12 @@ func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, t string) Chu
 // Read - initiate async consumption of Resource and population of data.Record buffer
 func (cr Chunk) Read() error {
 	resource, err := resources.FromConfig(cr.logger, cr.cfg, cr.target)
+	defer resource.Close()
+
 	rdr, err := resource.Reader()
 	if err != nil {
 		return errors.Wrapf(err, "Chunk: failed to obtain data stream from %s with cause", resource)
 	}
-	defer resource.Close()
 
 	gzRdr, err := gzip.NewReader(rdr)
 	if err != nil {

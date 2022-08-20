@@ -51,12 +51,30 @@ type Meta struct {
 }
 
 type Mode struct {
-	FromChunk int // fetch all available chunks with this ID and higher
-	//FromTime    time.Time // fetch all available chunks with this timestamp or more recent
+	// one of 'all', 'from-time' or 'from-chunk'
+	Type ModeType
+	// Unix millis since or chunk ID of last successfully
+	// ingested incremental chunk, depending on ModeType
+	From int64
 }
 
-func (m Mode) IsIncrementalRun() bool {
-	return m.FromChunk > 0
+func (m Mode) Incremental() bool {
+	return m.Type != All && m.From > 0
+}
+
+type ModeType uint8
+
+const (
+	UnknownMode ModeType = iota
+	All
+	FromTime
+	FromChunk
+)
+
+var ModeTypes = map[string]ModeType{
+	"all":        All,
+	"from-time":  FromTime,
+	"from-chunk": FromChunk,
 }
 
 type Source struct {

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
@@ -15,18 +16,19 @@ import (
 )
 
 var (
-	Format      string
-	Dest        string
-	Incremental bool
-	From        int
-	Concurrency int
+	Format string
+	Out    string
+	From   int64
+	Mode   string
+	Pool   int
 )
 
 func init() {
 	flag.StringVar(&Format, "format", "log", "output format: one of 'log', 'json', 'csv'")
-	flag.StringVar(&Dest, "dest", "", "if set, specifies the target output file or path. stdout if unset")
-	flag.IntVar(&From, "from", 0, "if non-zero, only process index chunk updates from the provided chunk ID to most recent")
-	flag.IntVar(&Concurrency, "concurrency", 4, "number of goroutines enabled to scan index chunks in parallel")
+	flag.StringVar(&Out, "out", "", "if set, specifies the output file path. stdout if unset")
+	flag.Int64Var(&From, "from", 0, "if non-zero, specifies the Unix milliseconds, or oldest chunk ID to process, in an incremental run")
+	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'from-time', 'from-chunk'")
+	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
 
 func main() {
@@ -46,11 +48,12 @@ func main() {
 			Type: config.HTTP,
 		},
 		Mode: config.Mode{
-			FromChunk: From,
+			Type: config.ModeTypes[strings.ToLower(Mode)],
+			From: From,
 		},
 		Output: config.Output{
-			Format: config.OutputFormats[Format],
-			File:   Dest,
+			Format: config.OutputFormats[strings.ToLower(Format)],
+			File:   Out,
 		},
 	}
 	if err := config.Validate(logger, mavenCentralCfg); err != nil {
@@ -72,10 +75,10 @@ func main() {
 	records := make(chan data.Record, 64)
 	out := output.ResolveFormat(logger, records, mavenCentralCfg)
 
-	// set up a fixed-size worker pool and feed resolved
+	// establish a fixed-size worker pool and feed resolved
 	// chunks to be scanned into the pool
 	var wg sync.WaitGroup
-	chunkWorkerPool := make(chan struct{}, Concurrency)
+	chunkWorkerPool := make(chan struct{}, Pool)
 	for chunkName := range chunkNamesQueue {
 		target := chunkName
 		wg.Add(1)
