@@ -26,7 +26,8 @@ var (
 func init() {
 	flag.StringVar(&Format, "format", "log", "output format: one of 'log', 'json', 'csv'")
 	flag.StringVar(&Out, "out", "", "if set, specifies the output file path. stdout if unset")
-	flag.Int64Var(&From, "from", 0, "if non-zero, specifies the Unix milliseconds, or oldest chunk ID to process, in an incremental run")
+	flag.Int64Var(&From, "from", 0, "if non-zero, specifies the chunk timestamp as Unix milliseconds, "+
+		"or oldest chunk ID to process, in an incremental run. depends on --mode")
 	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'from-time', 'from-chunk'")
 	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
