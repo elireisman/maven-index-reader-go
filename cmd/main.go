@@ -52,6 +52,13 @@ func main() {
 			Type: config.ModeTypes[strings.ToLower(Mode)],
 			From: From,
 		},
+		Filter: config.Filter{
+			// only these types are relevant to dumping indexed (or removed!) records
+			Allow: []data.RecordType{
+				data.ArtifactAdd,
+				data.ArtifactRemove,
+			},
+		},
 		Output: config.Output{
 			Format: config.OutputFormats[strings.ToLower(Format)],
 			File:   Out,

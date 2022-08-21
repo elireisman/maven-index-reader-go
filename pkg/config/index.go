@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+
+	"github.com/elireisman/maven-index-reader-go/pkg/data"
 )
 
 // Validate - the beginnings of a config.Index validator :)
@@ -27,6 +29,9 @@ func Validate(logger *log.Logger, cfg Index) error {
 	if cfg.Output.Format != Log && cfg.Output.Format != CSV && cfg.Output.Format != JSON {
 		return fmt.Errorf("Invalid configuration: valid format type (Output.Format) is required")
 	}
+	if len(cfg.Filter.Allow) > 0 && len(cfg.Filter.Deny) > 0 {
+		return fmt.Errorf("Invalid configuration: only one of Filter.Allow or Filter.Deny list may be populated")
+	}
 
 	return nil
 }
@@ -36,6 +41,7 @@ type Index struct {
 	Meta   Meta
 	Source Source
 	Mode   Mode
+	Filter Filter
 	Output Output
 }
 
@@ -89,6 +95,11 @@ const (
 	Local
 	HTTP
 )
+
+type Filter struct {
+	Allow []data.RecordType
+	Deny  []data.RecordType
+}
 
 type Output struct {
 	Format OutputType

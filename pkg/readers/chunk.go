@@ -17,6 +17,7 @@ import (
 type Chunk struct {
 	target string
 	cfg    config.Index
+	filter map[data.RecordType]bool
 	logger *log.Logger
 	buffer chan<- data.Record
 }
@@ -24,9 +25,19 @@ type Chunk struct {
 // NewChunk - caller supplies the input resource as well as the
 // output channel for captured records that the caller plans to consume
 func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, t string) Chunk {
+	// build read-optimized data.RecordType filter
+	f := map[data.RecordType]bool{}
+	for _, rt := range c.Filter.Allow {
+		f[rt] = true
+	}
+	for _, rt := range c.Filter.Deny {
+		f[rt] = false
+	}
+
 	return Chunk{
 		target: t,
 		cfg:    c,
+		filter: f,
 		logger: l,
 		buffer: b,
 	}
@@ -108,7 +119,7 @@ func (cr Chunk) Read() error {
 		}
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
-		if isSkippableRecordType(record) {
+		if cr.isSkippableRecordType(record) {
 			cr.logger.Printf("Chunk(%s): skipped Record by type %+v", cr.target, record)
 			if errors.Cause(err) == io.EOF {
 				return nil
@@ -116,7 +127,7 @@ func (cr Chunk) Read() error {
 			continue
 		}
 		if rErr != nil {
-			cr.logger.Panicf(
+			return errors.Wrapf(err,
 				"Chunk(%s): failed to compose well-formed record %d from %s with cause: %s",
 				cr.target, count, rawRecord, rErr)
 		}
@@ -131,7 +142,13 @@ func (cr Chunk) Read() error {
 	}
 }
 
-func isSkippableRecordType(record data.Record) bool {
-	return record.Type() != data.ArtifactAdd &&
-		record.Type() != data.ArtifactRemove
+func (cr Chunk) isSkippableRecordType(record data.Record) bool {
+	_, found := cr.filter[record.Type()]
+	if len(cr.cfg.Filter.Allow) > 0 {
+		return !found
+	} else if len(cr.cfg.Filter.Deny) > 0 {
+		return found
+	}
+
+	return false
 }
