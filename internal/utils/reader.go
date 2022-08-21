@@ -12,7 +12,7 @@ import (
 func ReadString(r io.Reader) (string, error) {
 	size, err := ReadUint16(r)
 	if err != nil {
-		return "", errors.Wrap(err, "ReadUTF8String: failed to read expected string length uint16 with cause")
+		return "", errors.Wrap(err, "ReadString: failed to read expected string length uint16 with cause")
 	}
 
 	return readUTF8String(r, int(size))
@@ -22,7 +22,7 @@ func ReadString(r io.Reader) (string, error) {
 func ReadLargeString(r io.Reader) (string, error) {
 	size, err := ReadInt32(r)
 	if err != nil {
-		return "", errors.Wrap(err, "ReadUTF8StringLong: failed to read expected string length int32 with cause")
+		return "", errors.Wrap(err, "ReadStringLong: failed to read expected string length int32 with cause")
 	}
 
 	return readUTF8String(r, int(size))
@@ -35,7 +35,7 @@ func readUTF8String(r io.Reader, strByteLen int) (string, error) {
 	var err error
 	var strBuf = make([]byte, strByteLen)
 
-	for bytesRead < strByteLen {
+	for bytesRead < strByteLen && err == nil {
 		var n int
 		n, err = r.Read(strBuf[bytesRead:])
 		bytesRead += n
@@ -68,7 +68,7 @@ func ReadUint16(r io.Reader) (uint16, error) {
 	var err error
 	var arr [2]byte
 
-	for bytesRead < 2 {
+	for bytesRead < 2 && err == nil {
 		var n int
 		n, err = r.Read(arr[bytesRead:])
 		bytesRead += n
@@ -92,7 +92,7 @@ func ReadInt32(r io.Reader) (int32, error) {
 	var err error
 	var arr [4]byte
 
-	for bytesRead < 4 {
+	for bytesRead < 4 && err == nil {
 		var n int
 		n, err = r.Read(arr[bytesRead:])
 		bytesRead += n
@@ -116,7 +116,7 @@ func ReadInt64(r io.Reader) (int64, error) {
 	var err error
 	var arr [8]byte
 
-	for bytesRead < 8 {
+	for bytesRead < 8 && err == nil {
 		var n int
 		n, err = r.Read(arr[bytesRead:])
 		bytesRead += n
@@ -158,7 +158,7 @@ func ReadVInt(r io.Reader) (int64, error) {
 	b := buf[0]
 
 	for err == nil {
-		val := b & 0x80
+		val := b & 0x7F
 		offset := ndx * 7
 		out |= (int64(val) << offset)
 		ndx++
@@ -171,6 +171,6 @@ func ReadVInt(r io.Reader) (int64, error) {
 		b = buf[0]
 	}
 
-	// a well-formed "out" can be returned with an io.EOF
+	// if no parse error, conserve possible reader io.EOF for caller
 	return out, err
 }
