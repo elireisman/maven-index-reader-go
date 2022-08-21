@@ -52,26 +52,19 @@ func GetString(strBuf []byte) (string, error) {
 			}
 		} else {
 			// if an expected single-byte rune begins with
-			// 1111xxxx or 10xxxxxx then it is invalid
+			// 1111xxxx or 10xxxxxx then it is invalid.
+			// if the first byte of a group matches the bit pattern
+			// 0xxxxxxx then the group consists of just that byte
 			if (strBuf[ndx]&0xf0) == 0xf0 || (strBuf[ndx]&0x80) == 0x80 {
 				return "", errors.Errorf(
-					"GetString: unexpected length 1 char at index %d of buffer of length %d: %s",
+					"GetString: invalid significant bits on expected char of length 1 at index %d of buffer of length %d: %s",
 					ndx, strByteLen, string(strBuf[ndx:ndx+1]))
 			}
-
 			// if this is a zero byte, something is wrong
 			if strBuf[ndx] == 0 {
 				return "", errors.Errorf(
 					"GetString: unexpected 0 bytes after index %d of buffer of length %d: %v",
 					ndx, strByteLen, strBuf[ndx:])
-			}
-
-			// if the first byte of a group matches the bit pattern
-			// 0xxxxxxx then the group consists of just that byte
-			if (strBuf[ndx] & 0x7f) != strBuf[ndx] {
-				return "", errors.Errorf(
-					"GetString: set MSB found on expected char of length 1 at index %d of buffer of length %d",
-					ndx, strByteLen)
 			}
 
 			// this 1-byte character is well-formed

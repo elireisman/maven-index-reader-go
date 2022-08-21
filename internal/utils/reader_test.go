@@ -4,22 +4,42 @@ import (
 	"bytes"
 	"io"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadString(t *testing.T) {
-	payload := "Hello World"
+	code, _ := utf8.DecodeRune([]byte{0xc3, 0xbd})
+	payload := "Hello " + string(code) + " World"
 	content := []byte(payload)
 	size := uint16(len(content))
 	sizeBytes := []byte{
 		byte((size >> 8)),
-		byte(size & 0xFF),
+		byte(size & 0xff),
 	}
 	buffer := bytes.NewBuffer(append(sizeBytes, content...))
 
 	got, err := ReadString(buffer)
+	require.NoError(t, err, payload)
+	require.Equal(t, payload, got)
+}
+
+func TestReadLargeString(t *testing.T) {
+	code, _ := utf8.DecodeRune([]byte{0xc3, 0xbd})
+	payload := "Hello " + string(code) + " World"
+	content := []byte(payload)
+	size := int32(len(content))
+	sizeBytes := []byte{
+		byte((size & 0xff) >> 24),
+		byte((size & 0xff) >> 16),
+		byte((size & 0xff) >> 8),
+		byte(size & 0xff),
+	}
+	buffer := bytes.NewBuffer(append(sizeBytes, content...))
+
+	got, err := ReadLargeString(buffer)
 	require.NoError(t, err, payload)
 	require.Equal(t, payload, got)
 }
