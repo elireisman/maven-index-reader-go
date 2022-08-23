@@ -37,7 +37,7 @@ func TestSimpleChunk(t *testing.T) {
 
 	target := simpleCfg.ResolveTarget(".gz")
 
-	records := make(chan data.Record, 4)
+	records := make(chan data.Record, 5)
 	chunk := NewChunk(logger, records, simpleCfg, target)
 
 	err := chunk.Read()
@@ -69,6 +69,12 @@ func TestSimpleChunk(t *testing.T) {
 	record = <-records
 	require.Equal(t, data.AllGroups, record.Type())
 	require.ElementsMatch(t, []string{"org.sonatype.test-evict", "org.sonatype.nexus"}, record.Get("allGroupsList"))
+
+	record = <-records
+	require.Equal(t, data.Descriptor, record.Type())
+	require.Equal(t, "apache-snapshots", record.Get("repositoryId"))
+	require.Equal(t, "1.0", record.Get("version"))
+	require.Equal(t, "NexusIndex", record.Get("DESCRIPTOR"))
 
 	close(records)
 }

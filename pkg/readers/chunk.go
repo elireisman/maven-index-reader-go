@@ -87,7 +87,7 @@ func (cr Chunk) Read() error {
 		}
 
 		rawRecord := map[string]string{}
-		for ndx := int32(0); ndx < fieldCount; ndx++ {
+		for ndx := int32(0); ndx < fieldCount && errors.Cause(err) != io.EOF; ndx++ {
 			// we ignore each Record's 1 byte of index bit flags
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
@@ -109,7 +109,7 @@ func (cr Chunk) Read() error {
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L189
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L196
 			value, err := utils.ReadLargeString(gzRdr)
-			if err != nil {
+			if err != nil && err != io.EOF {
 				return errors.Wrapf(err,
 					"Chunk(%s): failed to read field value for key %s on record %d with cause",
 					cr.target, key, count)
@@ -119,8 +119,8 @@ func (cr Chunk) Read() error {
 		}
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
-		if cr.isSkippableRecordType(record) {
-			cr.logger.Printf("Chunk(%s): skipped Record by type %+v", cr.target, record)
+		if cr.shouldFilterByRecordType(record) {
+			cr.logger.Printf("Chunk(%s): skipping Record of filtered type %+v", cr.target, record)
 			if errors.Cause(err) == io.EOF {
 				return nil
 			}
@@ -142,7 +142,7 @@ func (cr Chunk) Read() error {
 	}
 }
 
-func (cr Chunk) isSkippableRecordType(record data.Record) bool {
+func (cr Chunk) shouldFilterByRecordType(record data.Record) bool {
 	_, found := cr.filter[record.Type()]
 	if len(cr.cfg.Filter.Allow) > 0 {
 		return !found

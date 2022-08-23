@@ -52,6 +52,9 @@ const (
 	// Raw key on "ARTIFACT_ADD" type Records
 	SHA1Key = "1"
 
+	// Raw key on "DESCRIPTOR" type Records
+	IDXINFO = "IDXINFO"
+
 	// Parsed value for null records found in index source
 	NotAvailable = "NA"
 
@@ -84,6 +87,7 @@ var (
 	}
 
 	ArtifactRemoveRecordKeys = []keys.Record{
+		keys.Del,
 		keys.RecordModified,
 		keys.GroupID,
 		keys.ArtifactID,
@@ -94,14 +98,18 @@ var (
 	}
 
 	DescriptorRecordKeys = []keys.Record{
+		keys.Descriptor,
 		keys.RepositoryID,
+		keys.Version,
 	}
 
 	AllGroupsRecordKeys = []keys.Record{
+		keys.AllGroups,
 		keys.AllGroupsList,
 	}
 
 	RootGroupsRecordKeys = []keys.Record{
+		keys.RootGroups,
 		keys.RootGroupsList,
 	}
 )
@@ -169,9 +177,14 @@ func newDescriptorRecord(indexRecord map[string]string) (Record, error) {
 		keys: DescriptorRecordKeys,
 	}
 
-	if rawIDXInfoVal, found := indexRecord["IDXINFO"]; found {
+	if descVal, found := indexRecord[string(keys.Descriptor)]; found {
+		out.data[keys.Descriptor] = descVal
+	}
+
+	if rawIDXInfoVal, found := indexRecord[IDXINFO]; found {
 		splits := splitValue(rawIDXInfoVal)
 		out.data[keys.RepositoryID] = splits[1]
+		out.data[keys.Version] = splits[0]
 	}
 
 	return out, nil
@@ -182,6 +195,10 @@ func newAllGroupsRecord(indexRecord map[string]string) (Record, error) {
 		kind: AllGroups,
 		data: map[keys.Record]interface{}{},
 		keys: AllGroupsRecordKeys,
+	}
+
+	if agVal, found := indexRecord[string(keys.AllGroups)]; found {
+		out.data[keys.AllGroups] = agVal
 	}
 
 	if groups, ok := stringArrayIfNotNull(indexRecord, string(keys.AllGroupsList)); ok {
@@ -198,6 +215,10 @@ func newRootGroupsRecord(indexRecord map[string]string) (Record, error) {
 		keys: RootGroupsRecordKeys,
 	}
 
+	if rgVal, found := indexRecord[string(keys.RootGroups)]; found {
+		out.data[keys.RootGroups] = rgVal
+	}
+
 	if groups, ok := stringArrayIfNotNull(indexRecord, string(keys.RootGroupsList)); ok {
 		out.data[keys.RootGroupsList] = groups
 	}
@@ -210,6 +231,10 @@ func newArtifactRemoveRecord(indexRecord map[string]string) (Record, error) {
 		kind: ArtifactRemove,
 		data: map[keys.Record]interface{}{},
 		keys: ArtifactRemoveRecordKeys,
+	}
+
+	if delVal, found := indexRecord[string(keys.Del)]; found {
+		out.data[keys.Del] = delVal
 	}
 
 	// populate fields using index source internal fields
