@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
@@ -51,7 +52,7 @@ func TestSimpleChunk(t *testing.T) {
 	require.Equal(t, "Nexus Repository Manager", record.Get("name"))
 	require.Equal(t, "pom", record.Get("packaging"))
 	require.Equal(t, "pom", record.Get("fileExtension"))
-	require.Equal(t, int64(1243533415343), record.Get("fileModified"))
+	require.Equal(t, time.UnixMilli(1243533415343).UTC(), record.Get("fileModified"))
 
 	record = <-records
 	require.Equal(t, data.ArtifactAdd, record.Type())
@@ -60,7 +61,7 @@ func TestSimpleChunk(t *testing.T) {
 	require.Equal(t, "1.0-SNAPSHOT", record.Get("version"))
 	require.Equal(t, "jar", record.Get("packaging"))
 	require.Equal(t, "jar", record.Get("fileExtension"))
-	require.Equal(t, int64(1243533415359), record.Get("fileModified"))
+	require.Equal(t, time.UnixMilli(1243533415359).UTC(), record.Get("fileModified"))
 
 	record = <-records
 	require.Equal(t, data.RootGroups, record.Type())
@@ -74,7 +75,6 @@ func TestSimpleChunk(t *testing.T) {
 	require.Equal(t, data.Descriptor, record.Type())
 	require.Equal(t, "apache-snapshots", record.Get("repositoryId"))
 	require.Equal(t, "1.0", record.Get("version"))
-	require.Equal(t, "NexusIndex", record.Get("DESCRIPTOR"))
 
 	close(records)
 }

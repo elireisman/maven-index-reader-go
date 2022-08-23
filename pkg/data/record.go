@@ -4,6 +4,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/data/types/record/keys"
 )
@@ -87,7 +88,6 @@ var (
 	}
 
 	ArtifactRemoveRecordKeys = []keys.Record{
-		keys.Del,
 		keys.RecordModified,
 		keys.GroupID,
 		keys.ArtifactID,
@@ -98,18 +98,15 @@ var (
 	}
 
 	DescriptorRecordKeys = []keys.Record{
-		keys.Descriptor,
 		keys.RepositoryID,
 		keys.Version,
 	}
 
 	AllGroupsRecordKeys = []keys.Record{
-		keys.AllGroups,
 		keys.AllGroupsList,
 	}
 
 	RootGroupsRecordKeys = []keys.Record{
-		keys.RootGroups,
 		keys.RootGroupsList,
 	}
 )
@@ -177,10 +174,6 @@ func newDescriptorRecord(indexRecord map[string]string) (Record, error) {
 		keys: DescriptorRecordKeys,
 	}
 
-	if descVal, found := indexRecord[string(keys.Descriptor)]; found {
-		out.data[keys.Descriptor] = descVal
-	}
-
 	if rawIDXInfoVal, found := indexRecord[IDXINFO]; found {
 		splits := splitValue(rawIDXInfoVal)
 		out.data[keys.RepositoryID] = splits[1]
@@ -197,10 +190,6 @@ func newAllGroupsRecord(indexRecord map[string]string) (Record, error) {
 		keys: AllGroupsRecordKeys,
 	}
 
-	if agVal, found := indexRecord[string(keys.AllGroups)]; found {
-		out.data[keys.AllGroups] = agVal
-	}
-
 	if groups, ok := stringArrayIfNotNull(indexRecord, string(keys.AllGroupsList)); ok {
 		out.data[keys.AllGroupsList] = groups
 	}
@@ -213,10 +202,6 @@ func newRootGroupsRecord(indexRecord map[string]string) (Record, error) {
 		kind: RootGroups,
 		data: map[keys.Record]interface{}{},
 		keys: RootGroupsRecordKeys,
-	}
-
-	if rgVal, found := indexRecord[string(keys.RootGroups)]; found {
-		out.data[keys.RootGroups] = rgVal
 	}
 
 	if groups, ok := stringArrayIfNotNull(indexRecord, string(keys.RootGroupsList)); ok {
@@ -233,13 +218,9 @@ func newArtifactRemoveRecord(indexRecord map[string]string) (Record, error) {
 		keys: ArtifactRemoveRecordKeys,
 	}
 
-	if delVal, found := indexRecord[string(keys.Del)]; found {
-		out.data[keys.Del] = delVal
-	}
-
 	// populate fields using index source internal fields
-	if tsMillis, ok := millisTimestampIfNotNull(indexRecord, "m"); ok {
-		out.data[keys.RecordModified] = tsMillis
+	if ts, ok := unixMillisToTimestampIfNotNull(indexRecord, "m"); ok {
+		out.data[keys.RecordModified] = ts
 	}
 	out = expandUInfo(indexRecord, string(keys.Del), out)
 
@@ -273,14 +254,16 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		if err != nil {
 			fm = 0
 		}
-		out.data[keys.FileModified] = fm
+		fmTime := time.UnixMilli(fm)
+		out.data[keys.FileModified] = fmTime.UTC()
 
 		// int64 as file size
 		fs, err := strconv.ParseInt(vals[2], 10, 64)
 		if err != nil {
 			fs = 0
 		}
-		out.data[keys.FileSize] = fs
+		fsTime := time.UnixMilli(fs)
+		out.data[keys.FileSize] = fsTime.UTC()
 
 		out.data[keys.HasSources] = strings.Trim(vals[3], " \t\r\n") == "1"
 		out.data[keys.HasJavadoc] = strings.Trim(vals[4], " \t\r\n") == "1"
@@ -302,8 +285,8 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 	}
 
 	// populate other fields using index source internal fields
-	if tsMillis, ok := millisTimestampIfNotNull(indexRecord, RecordModifiedKey); ok {
-		out.data[keys.RecordModified] = tsMillis
+	if ts, ok := unixMillisToTimestampIfNotNull(indexRecord, RecordModifiedKey); ok {
+		out.data[keys.RecordModified] = ts
 	}
 	if name, ok := stringIfNotNull(indexRecord, NameKey); ok {
 		out.data[keys.Name] = name
@@ -390,15 +373,15 @@ func stringArrayIfNotNull(indexRecord map[string]string, rawKey string) ([]strin
 	return nil, false
 }
 
-func millisTimestampIfNotNull(indexRecord map[string]string, rawKey string) (int64, bool) {
+func unixMillisToTimestampIfNotNull(indexRecord map[string]string, rawKey string) (time.Time, bool) {
 	rawValue, found := indexRecord[rawKey]
 	if found && len(rawValue) > 0 {
 		if tsMillis, err := strconv.ParseInt(rawValue, 10, 64); err != nil {
-			return tsMillis, true
+			return time.UnixMilli(tsMillis).UTC(), true
 		}
 	}
 
-	return 0, false
+	return time.Now().UTC(), false
 }
 
 // https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/RecordExpander.java#L66-L81
