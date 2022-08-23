@@ -262,8 +262,7 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		if err != nil {
 			fs = 0
 		}
-		fsTime := time.UnixMilli(fs)
-		out.data[keys.FileSize] = fsTime.UTC()
+		out.data[keys.FileSize] = fs
 
 		out.data[keys.HasSources] = strings.Trim(vals[3], " \t\r\n") == "1"
 		out.data[keys.HasJavadoc] = strings.Trim(vals[4], " \t\r\n") == "1"
