@@ -6,6 +6,9 @@ A basic port of [this utility](https://github.com/apache/maven-indexer/tree/mast
 
 There is an example binary [here](https://github.com/elireisman/maven-index-reader-go/blob/main/cmd/main.go) for dumping the Maven Central index that you can build by running `make` from the checkout root. Following that example, you can use the [public packages](https://github.com/elireisman/maven-index-reader-go/tree/main/pkg) as utility libraries to compose your own dumper for other remote or local indices.
 
+This isn't production quality! It's a PoC at the moment, and could benefit from some refactoring, improvement of various hackery, and better test coverage. I might get to _some_ of that in the near future. That said, I've been using it to scan the full and incremental chunks of the Maven Central index, and a few small test indices, without incident.
+
+
 #### Usage Example
 ```bash
 # Dump Maven Central add/remove records from all
