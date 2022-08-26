@@ -2,11 +2,11 @@
 
 
 ## What?
-A basic port of [this utility](https://github.com/apache/maven-indexer/tree/master/indexer-reader) to Go. Includes support for full or incremental updates from a given last-successfully-consumed chunk ID or timestamp, filtering for various record types (only `ARTIFACT_ADD` and `ARTIFACT_REMOVE` are typically useful) and output in JSON or CSV formats to a local file or `stdout`.
+A basic port of [this utility](https://github.com/apache/maven-indexer/tree/master/indexer-reader) to Go. Includes support for full or incremental updates starting after a supplied last-successfully-consumed chunk ID or RFC3339 chunk timestamp, filtering for various record types (only `ARTIFACT_ADD` and `ARTIFACT_REMOVE` are typically useful) and output in JSON or CSV formats to a local file or `stdout`.
 
 There is an example binary [here](https://github.com/elireisman/maven-index-reader-go/blob/main/cmd/main.go) for dumping the Maven Central index that you can build by running `make` from the checkout root. Following that example, you can use the [public packages](https://github.com/elireisman/maven-index-reader-go/tree/main/pkg) as utility libraries to compose your own dumper for other remote or local indices.
 
-This isn't production quality! It's a PoC at the moment, and could benefit from some refactoring, improvement of various hackery, and better test coverage. I might get to _some_ of that in the near future. That said, I've been using it to scan the full and incremental chunks of the Maven Central index, and a few small test indices, without incident.
+This isn't production quality yet. It's a PoC, and could benefit from some refactoring, improvement of various hackery, and better test coverage. I might get to _some_ of that in the near future. That said, I've been using it to scan the full and incremental chunks of the Maven Central index, and a few small test indices, without incident.
 
 
 #### Usage Example
@@ -14,7 +14,7 @@ This isn't production quality! It's a PoC at the moment, and could benefit from 
 # Dump Maven Central add/remove records from all
 # incremental index updates published _after_ chunk 768.
 $ make
-$ bin/index_reader --from 768 --mode from-chunk --format json > index.dump
+$ bin/index_reader --after 768 --mode after-chunk --format json > index.dump 
 
 # Example output
 $ head -10 index.dump

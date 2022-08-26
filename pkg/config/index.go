@@ -3,8 +3,12 @@ package config
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
+
+	"github.com/pkg/errors"
 )
 
 // Validate - the beginnings of a config.Index validator :)
@@ -12,25 +16,45 @@ func Validate(logger *log.Logger, cfg Index) error {
 	logger.Printf("Resolved configuration: %+v\n", cfg)
 
 	if len(cfg.Meta.File) == 0 {
-		return fmt.Errorf("Invalid configuration: index base file name (Meta.File) is required")
+		return errors.Errorf("Invalid configuration: index base file name (Meta.File) is required")
 	}
 	if len(cfg.Meta.ID) == 0 {
-		return fmt.Errorf("Invalid configuration: index identifier (Meta.ID) is required")
+		return errors.Errorf("Invalid configuration: index identifier (Meta.ID) is required")
 	}
 	if len(cfg.Meta.ChainID) == 0 {
-		return fmt.Errorf("Invalid configuration: index chain ID (Meta.ChainID) is required")
+		return errors.Errorf("Invalid configuration: index chain ID (Meta.ChainID) is required")
 	}
 	if len(cfg.Source.Base) == 0 {
-		return fmt.Errorf("Invalid configuration: index base URL (Source.Base) is required")
+		return errors.Errorf("Invalid configuration: index base URL (Source.Base) is required")
 	}
 	if cfg.Source.Type != Local && cfg.Source.Type != HTTP {
-		return fmt.Errorf("Invalid configuration: index location (Source.Type) is required")
+		return errors.Errorf("Invalid configuration: index location (Source.Type) is required")
 	}
 	if cfg.Output.Format != Log && cfg.Output.Format != CSV && cfg.Output.Format != JSON {
-		return fmt.Errorf("Invalid configuration: valid format type (Output.Format) is required")
+		return errors.Errorf("Invalid configuration: valid format type (Output.Format) is required")
 	}
 	if len(cfg.Filter.Allow) > 0 && len(cfg.Filter.Deny) > 0 {
-		return fmt.Errorf("Invalid configuration: only one of Filter.Allow or Filter.Deny list may be populated")
+		return errors.Errorf("Invalid configuration: only one of Filter.Allow or Filter.Deny list may be populated")
+	}
+	if cfg.Mode.Type > All && len(cfg.Mode.After) == 0 {
+		return errors.New("Invalid configuration: Mode.Type specifies incremental run but Mode.After empty")
+	}
+	switch cfg.Mode.Type {
+	case AfterChunk:
+		if _, err := strconv.Atoi(cfg.Mode.After); err != nil {
+			return errors.Wrapf(err, "Invalid configuration: invalid integer on Mode.After (%s) with cause", cfg.Mode.After)
+		}
+
+	case AfterTime:
+		if _, err := time.Parse(time.RFC3339, cfg.Mode.After); err != nil {
+			return errors.Wrapf(err, "Invalid configuration: invalid timestamp on Mode.After (%s) with cause", cfg.Mode.After)
+		}
+
+	case All:
+		// nothing to validate here
+
+	default:
+		return errors.Errorf("Invalid configuration: invalid Mode.Type")
 	}
 
 	return nil
@@ -57,15 +81,15 @@ type Meta struct {
 }
 
 type Mode struct {
-	// one of 'all', 'from-time' or 'from-chunk'
+	// one of 'all', 'after-time' or 'after-chunk'
 	Type ModeType
-	// Unix millis since or chunk ID of last successfully
-	// ingested incremental chunk, depending on ModeType
-	From int64
+	// time.Time string since, or chunk ID of, last successfully
+	// ingested incremental chunk, depending on specified ModeType
+	After string
 }
 
 func (m Mode) Incremental() bool {
-	return m.Type != All && m.From > 0
+	return m.Type > All && len(m.After) > 0
 }
 
 type ModeType uint8
@@ -73,14 +97,14 @@ type ModeType uint8
 const (
 	UnknownMode ModeType = iota
 	All
-	FromTime
-	FromChunk
+	AfterTime
+	AfterChunk
 )
 
 var ModeTypes = map[string]ModeType{
-	"all":        All,
-	"from-time":  FromTime,
-	"from-chunk": FromChunk,
+	"all":         All,
+	"after-time":  AfterTime,
+	"after-chunk": AfterChunk,
 }
 
 type Source struct {

@@ -3,6 +3,7 @@ package readers
 import (
 	"compress/gzip"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/elireisman/maven-index-reader-go/internal/utils"
@@ -85,11 +86,15 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 	var out []string
 
 	switch ir.cfg.Mode.Type {
-	case config.FromChunk:
+	case config.AfterChunk:
 		// assumption: cfg.Mode.From is the chunk ID of the last
 		// successfully processed chunk from the previous run;
 		// start consuming for this run from the NEXT chunk ID
-		candidateChunkID := int(ir.cfg.Mode.From) + 1
+		lastSuccessfulChunk, err := strconv.Atoi(ir.cfg.Mode.After)
+		if err != nil {
+			return out, errors.Wrapf(err, "Index: failed to parse chunk ID %s with cause", ir.cfg.Mode.After)
+		}
+		candidateChunkID := lastSuccessfulChunk + 1
 
 		// TODO: original (Java) version also checks if successor to latestChunkID is already partially available
 
@@ -105,10 +110,13 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 			time.Sleep(500 * time.Millisecond)
 		}
 
-	case config.FromTime:
-		// assumption: cfg.Mode.From is a Unix timestamp of the last
-		// successfully processed chunk from the previous run
-		fromTime := time.UnixMilli(ir.cfg.Mode.From)
+	case config.AfterTime:
+		// assumption: cfg.Mode.After is a valid RFC 3339 time string of
+		// the last successfully processed chunk from the previous run
+		fromTime, err := time.Parse(time.RFC3339, ir.cfg.Mode.After)
+		if err != nil {
+			return out, errors.Wrapf(err, "Index: failed to parse chunk timestamp %s with cause", ir.cfg.Mode.After)
+		}
 		candidateChunkID := latestChunkID
 
 		for candidateChunkID > 0 {

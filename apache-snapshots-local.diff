@@ -1,0 +1,33 @@
+diff --git a/cmd/main.go b/cmd/main.go
+index 69056f2..6eb21d8 100644
+--- a/cmd/main.go
++++ b/cmd/main.go
+@@ -40,13 +40,13 @@ func main() {
+ 	mavenCentralCfg := config.Index{
+ 		Meta: config.Meta{
+ 			// from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
+-			ID:      "central",
+-			ChainID: "1318453614498",
++			ID:      "apache-snapshots-local", //"central",
++			ChainID: "1243533418968",          // "1318453614498",
+ 			File:    "nexus-maven-repository-index",
+ 		},
+ 		Source: config.Source{
+-			Base: "https://repo1.maven.org/maven2/.index/",
+-			Type: config.HTTP,
++			Base: "pkg/readers/testdata/", //"https://repo1.maven.org/maven2/.index/",
++			Type: config.Local,            //config.HTTP,
+ 		},
+ 		Mode: config.Mode{
+ 			Type: config.ModeTypes[strings.ToLower(Mode)],
+@@ -55,8 +55,8 @@ func main() {
+ 		Filter: config.Filter{
+ 			// only these types are relevant to dumping indexed (or removed!) records
+ 			Allow: []data.RecordType{
+-				data.ArtifactAdd,
+-				data.ArtifactRemove,
++				//data.ArtifactAdd,
++				//data.ArtifactRemove,
+ 			},
+ 		},
+ 		Output: config.Output{

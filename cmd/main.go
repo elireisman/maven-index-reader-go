@@ -18,7 +18,7 @@ import (
 var (
 	Format string
 	Out    string
-	From   int64
+	After  string
 	Mode   string
 	Pool   int
 )
@@ -26,9 +26,8 @@ var (
 func init() {
 	flag.StringVar(&Format, "format", "log", "output format: one of 'log', 'json', 'csv'")
 	flag.StringVar(&Out, "out", "", "if set, specifies the output file path. stdout if unset")
-	flag.Int64Var(&From, "from", 0, "if non-zero, specifies the chunk timestamp as Unix milliseconds, "+
-		"or oldest chunk ID to process, in an incremental run. depends on --mode")
-	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'from-time', 'from-chunk'")
+	flag.StringVar(&After, "after", "", "value depends on --mode; RFC 3339 time string, or int chunk ID, of the last successfully processed chunk")
+	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'after-time', 'after-chunk'")
 	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
 
@@ -49,8 +48,8 @@ func main() {
 			Type: config.HTTP,
 		},
 		Mode: config.Mode{
-			Type: config.ModeTypes[strings.ToLower(Mode)],
-			From: From,
+			Type:  config.ModeTypes[strings.ToLower(Mode)],
+			After: After,
 		},
 		Filter: config.Filter{
 			// only these types are relevant to dumping indexed (or removed!) records
