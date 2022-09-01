@@ -11,7 +11,9 @@ import (
 
 // Validate - the beginnings of a config.Index validator :)
 func Validate(logger *log.Logger, cfg Index) error {
-	logger.Printf("Resolved configuration: %+v\n", cfg)
+	if cfg.Verbose {
+		logger.Printf("Resolved configuration: %+v\n", cfg)
+	}
 
 	if len(cfg.Meta.File) == 0 {
 		return errors.Errorf("Invalid configuration: index base file name (Meta.File) is required")
@@ -57,10 +59,11 @@ func Validate(logger *log.Logger, cfg Index) error {
 
 // configuration for an readers.IndexReader
 type Index struct {
-	Meta   Meta
-	Source Source
-	Mode   Mode
-	Output Output
+	Verbose bool
+	Meta    Meta
+	Source  Source
+	Mode    Mode
+	Output  Output
 }
 
 // Resolve the full Resource target string from supplied config.Index and args

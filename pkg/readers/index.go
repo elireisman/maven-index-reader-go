@@ -105,7 +105,10 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 				return out, errors.Wrapf(err, "Index: failed to resolve remote chunk at %s with cause", candidate)
 			}
 
-			ir.logger.Printf("Index: selected chunk %s", candidate)
+			if ir.cfg.Verbose {
+				ir.logger.Printf("Index: selected chunk %s", candidate)
+			}
+
 			out = append(out, candidate)
 			candidateChunkID++
 			time.Sleep(500 * time.Millisecond)
@@ -130,7 +133,10 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 				break
 			}
 
-			ir.logger.Printf("Index: selected chunk %s with timestamp %s", candidate, chunkTime)
+			if ir.cfg.Verbose {
+				ir.logger.Printf("Index: selected chunk %s with timestamp %s", candidate, chunkTime)
+			}
+
 			out = append(out, candidate)
 			candidateChunkID--
 			time.Sleep(500 * time.Millisecond)

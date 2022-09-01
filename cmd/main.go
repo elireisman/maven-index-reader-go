@@ -9,6 +9,7 @@ import (
 
 	"github.com/elireisman/maven-index-reader-go/pkg/config"
 	"github.com/elireisman/maven-index-reader-go/pkg/data"
+	"github.com/elireisman/maven-index-reader-go/pkg/data/types/record/keys"
 	"github.com/elireisman/maven-index-reader-go/pkg/output"
 	"github.com/elireisman/maven-index-reader-go/pkg/readers"
 
@@ -16,11 +17,12 @@ import (
 )
 
 var (
-	Format string
-	Out    string
-	After  string
-	Mode   string
-	Pool   int
+	Format  string
+	Out     string
+	After   string
+	Mode    string
+	Pool    int
+	Verbose bool
 )
 
 func init() {
@@ -29,12 +31,20 @@ func init() {
 	flag.StringVar(&After, "after", "", "value depends on --mode; RFC 3339 time string, or int chunk ID, of the last successfully processed chunk")
 	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'after-time', 'after-chunk'")
 	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
+	flag.BoolVar(&Verbose, "verbose", false, "log config, skipped records, and progress verbosely")
 }
 
 // implements readers.FilterFunc contract to filter
 // extracted Maven Central records of interest
 func filterFn(record data.Record) bool {
+	// skip all but ARTIFACT_ADD and ARTIFACT_REMOVE records
 	if record.Type() != data.ArtifactAdd && record.Type() != data.ArtifactRemove {
+		return false
+	}
+
+	// skip records that aren't associated with a binary artifact,
+	// like "javadoc" and "sources" entries
+	if record.Get(keys.Classifier) != nil {
 		return false
 	}
 
@@ -47,6 +57,7 @@ func main() {
 	logger := log.Default()
 
 	mavenCentralCfg := config.Index{
+		Verbose: Verbose,
 		Meta: config.Meta{
 			// from https://repo1.maven.org/maven2/.index/nexus-maven-repository-index.properties
 			ID:      "central",

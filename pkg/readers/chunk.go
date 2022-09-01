@@ -115,7 +115,9 @@ func (cr Chunk) Read() error {
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
 		if cr.filterFn != nil && !cr.filterFn(record) {
-			cr.logger.Printf("Chunk(%s): skipping filtered record: %+v", cr.target, record)
+			if cr.cfg.Verbose {
+				cr.logger.Printf("Chunk(%s): skipping filtered record: %+v", cr.target, record)
+			}
 			if errors.Cause(err) == io.EOF {
 				return nil
 			}
