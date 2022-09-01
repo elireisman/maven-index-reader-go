@@ -105,6 +105,7 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 				return out, errors.Wrapf(err, "Index: failed to resolve remote chunk at %s with cause", candidate)
 			}
 
+			ir.logger.Printf("Index: selected chunk %s", candidate)
 			out = append(out, candidate)
 			candidateChunkID++
 			time.Sleep(500 * time.Millisecond)
@@ -129,6 +130,7 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 				break
 			}
 
+			ir.logger.Printf("Index: selected chunk %s with timestamp %s", candidate, chunkTime)
 			out = append(out, candidate)
 			candidateChunkID--
 			time.Sleep(500 * time.Millisecond)
@@ -178,9 +180,7 @@ func (ir Index) remoteChunkTime(target string) (time.Time, error) {
 		return time.Now(), errors.Wrapf(err, "Index: failed to read chunk %s timestamp with cause", target)
 	}
 
-	secs := unixMillis / 1000
-	nanos := (unixMillis % 1000) * 1000000
-	return time.Unix(secs, nanos), nil
+	return time.UnixMilli(unixMillis), nil
 }
 
 func (ir Index) validateProperties(props data.Properties) error {

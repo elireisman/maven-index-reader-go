@@ -31,6 +31,16 @@ func init() {
 	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
 }
 
+// implements readers.FilterFunc contract to filter
+// extracted Maven Central records of interest
+func filterFn(record data.Record) bool {
+	if record.Type() != data.ArtifactAdd && record.Type() != data.ArtifactRemove {
+		return false
+	}
+
+	return true
+}
+
 func main() {
 	flag.Parse()
 
@@ -50,13 +60,6 @@ func main() {
 		Mode: config.Mode{
 			Type:  config.ModeTypes[strings.ToLower(Mode)],
 			After: After,
-		},
-		Filter: config.Filter{
-			// only these types are relevant to dumping indexed (or removed!) records
-			Allow: []data.RecordType{
-				data.ArtifactAdd,
-				data.ArtifactRemove,
-			},
 		},
 		Output: config.Output{
 			Format: config.OutputFormats[strings.ToLower(Format)],
@@ -97,7 +100,7 @@ func main() {
 			}()
 
 			chunkWorkerPool <- struct{}{}
-			chunk := readers.NewChunk(logger, records, mavenCentralCfg, target)
+			chunk := readers.NewChunk(logger, records, mavenCentralCfg, target, filterFn)
 			if err := chunk.Read(); err != nil {
 				if errors.Cause(err) == io.EOF {
 					logger.Printf("Chunk: EOF encountered for chunk: %s", target)

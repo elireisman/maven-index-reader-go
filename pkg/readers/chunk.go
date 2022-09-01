@@ -15,31 +15,26 @@ import (
 )
 
 type Chunk struct {
-	target string
-	cfg    config.Index
-	filter map[data.RecordType]bool
-	logger *log.Logger
-	buffer chan<- data.Record
+	target   string
+	cfg      config.Index
+	logger   *log.Logger
+	buffer   chan<- data.Record
+	filterFn FilterFunc
 }
+
+// caller-defined filter on data.Records extracted
+// from the chunk. Returning false drops the record
+type FilterFunc func(data.Record) bool
 
 // NewChunk - caller supplies the input resource as well as the
 // output channel for captured records that the caller plans to consume
-func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, t string) Chunk {
-	// build read-optimized data.RecordType filter
-	f := map[data.RecordType]bool{}
-	for _, rt := range c.Filter.Allow {
-		f[rt] = true
-	}
-	for _, rt := range c.Filter.Deny {
-		f[rt] = false
-	}
-
+func NewChunk(l *log.Logger, b chan<- data.Record, c config.Index, t string, ff FilterFunc) Chunk {
 	return Chunk{
-		target: t,
-		cfg:    c,
-		filter: f,
-		logger: l,
-		buffer: b,
+		target:   t,
+		cfg:      c,
+		logger:   l,
+		buffer:   b,
+		filterFn: ff,
 	}
 }
 
@@ -119,8 +114,8 @@ func (cr Chunk) Read() error {
 		}
 
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
-		if cr.shouldFilterByRecordType(record) {
-			cr.logger.Printf("Chunk(%s): skipping Record of filtered type %+v", cr.target, record)
+		if cr.filterFn != nil && !cr.filterFn(record) {
+			cr.logger.Printf("Chunk(%s): skipping filtered record: %+v", cr.target, record)
 			if errors.Cause(err) == io.EOF {
 				return nil
 			}
@@ -140,15 +135,4 @@ func (cr Chunk) Read() error {
 		}
 		count++
 	}
-}
-
-func (cr Chunk) shouldFilterByRecordType(record data.Record) bool {
-	_, found := cr.filter[record.Type()]
-	if len(cr.cfg.Filter.Allow) > 0 {
-		return !found
-	} else if len(cr.cfg.Filter.Deny) > 0 {
-		return found
-	}
-
-	return false
 }

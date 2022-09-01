@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/elireisman/maven-index-reader-go/pkg/data"
-
 	"github.com/pkg/errors"
 )
 
@@ -32,9 +30,6 @@ func Validate(logger *log.Logger, cfg Index) error {
 	}
 	if cfg.Output.Format != Log && cfg.Output.Format != CSV && cfg.Output.Format != JSON {
 		return errors.Errorf("Invalid configuration: valid format type (Output.Format) is required")
-	}
-	if len(cfg.Filter.Allow) > 0 && len(cfg.Filter.Deny) > 0 {
-		return errors.Errorf("Invalid configuration: only one of Filter.Allow or Filter.Deny list may be populated")
 	}
 	if cfg.Mode.Type > All && len(cfg.Mode.After) == 0 {
 		return errors.New("Invalid configuration: Mode.Type specifies incremental run but Mode.After empty")
@@ -65,7 +60,6 @@ type Index struct {
 	Meta   Meta
 	Source Source
 	Mode   Mode
-	Filter Filter
 	Output Output
 }
 
@@ -119,11 +113,6 @@ const (
 	Local
 	HTTP
 )
-
-type Filter struct {
-	Allow []data.RecordType
-	Deny  []data.RecordType
-}
 
 type Output struct {
 	Format OutputType
