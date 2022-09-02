@@ -92,7 +92,7 @@ func (cr Chunk) Read() error {
 			}
 
 			// a Record's *key* conforms to standard Java "readUTF" behavior
-			// including a max size field of 2 bytes (uint16)
+			// including a max size field of 2 bytes
 			key, err := utils.ReadString(gzRdr)
 			if err != nil {
 				return errors.Wrapf(err,
@@ -100,11 +100,15 @@ func (cr Chunk) Read() error {
 					cr.target, count)
 			}
 
-			// a Record's *value* can be larger; the size field is 4 bytes (int32)
+			// a Record's *value* can be larger; the size field is 4 bytes
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L189
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L196
 			value, err := utils.ReadLargeString(gzRdr)
 			if err != nil && err != io.EOF {
+				// why io.EOF check here? it's quite possible for a
+				// well-formed *value* to be returned here with an EOF,
+				// indicating we have obtained one last well-formed KV
+				// pair to add to this (now complete) Record
 				return errors.Wrapf(err,
 					"Chunk(%s): failed to read field value for key %s on record %d with cause",
 					cr.target, key, count)
@@ -113,7 +117,11 @@ func (cr Chunk) Read() error {
 			rawRecord[key] = value
 		}
 
+		// parse raw captured KVs into a Record
 		record, rErr := data.NewRecord(cr.logger, rawRecord)
+
+		// before we care about Record parsing errors, let's
+		// make sure the caller wants this Record at all
 		if cr.filterFn != nil && !cr.filterFn(record) {
 			if cr.cfg.Verbose {
 				cr.logger.Printf("Chunk(%s): skipping filtered record: %+v", cr.target, record)
@@ -123,6 +131,9 @@ func (cr Chunk) Read() error {
 			}
 			continue
 		}
+
+		// OK, before we pass the new Record along for post-processing,
+		// let's make sure it isn't corrupted
 		if rErr != nil {
 			return errors.Wrapf(err,
 				"Chunk(%s): failed to compose well-formed record %d from %s with cause: %s",
@@ -131,6 +142,7 @@ func (cr Chunk) Read() error {
 
 		cr.buffer <- record
 
+		// if this was the last well-formed Record in the index Chunk, we're done
 		if errors.Cause(err) == io.EOF {
 			cr.logger.Printf("Chunk: successfully published %d records from %s", count, resource)
 			return nil
