@@ -82,7 +82,7 @@ func (cr Chunk) Read() error {
 		}
 
 		rawRecord := map[string]string{}
-		for ndx := int32(0); ndx < fieldCount && errors.Cause(err) != io.EOF; ndx++ {
+		for ndx := int32(0); ndx < fieldCount; ndx++ {
 			// we ignore each Record's 1 byte of index bit flags
 			_, err = utils.ReadByte(gzRdr)
 			if err != nil {
@@ -104,7 +104,7 @@ func (cr Chunk) Read() error {
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L189
 			// https://github.com/apache/maven-indexer/blob/31052fdeebc8a9f845eb18cd4c13669b316b3e29/indexer-reader/src/main/java/org/apache/maven/index/reader/Chunk.java#L196
 			value, err := utils.ReadLargeString(gzRdr)
-			if err != nil && err != io.EOF {
+			if err != nil && errors.Cause(err) != io.EOF {
 				// why io.EOF check here? it's quite possible for a
 				// well-formed *value* to be returned here with an EOF,
 				// indicating we have obtained one last well-formed KV
