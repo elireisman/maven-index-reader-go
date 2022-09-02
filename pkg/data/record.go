@@ -219,7 +219,7 @@ func newArtifactRemoveRecord(indexRecord map[string]string) (Record, error) {
 	}
 
 	// populate fields using index source internal fields
-	if ts, ok := unixMillisToTimestampIfNotNull(indexRecord, "m"); ok {
+	if ts, ok := unixMillisToTimestampIfNotNull(indexRecord, RecordModifiedKey); ok {
 		out.data[keys.RecordModified] = ts
 	}
 	out = expandUInfo(indexRecord, string(keys.Del), out)
@@ -375,8 +375,8 @@ func stringArrayIfNotNull(indexRecord map[string]string, rawKey string) ([]strin
 func unixMillisToTimestampIfNotNull(indexRecord map[string]string, rawKey string) (time.Time, bool) {
 	rawValue, found := indexRecord[rawKey]
 	if found && len(rawValue) > 0 {
-		if tsMillis, err := strconv.ParseInt(rawValue, 10, 64); err != nil {
-			return time.UnixMilli(tsMillis).UTC(), true
+		if tsMillis, err := strconv.ParseInt(rawValue, 10, 64); err == nil {
+			return time.UnixMilli(tsMillis), true
 		}
 	}
 
