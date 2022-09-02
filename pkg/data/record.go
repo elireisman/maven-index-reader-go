@@ -254,8 +254,7 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		if err != nil {
 			fm = 0
 		}
-		fmTime := time.UnixMilli(fm)
-		out.data[keys.FileModified] = fmTime.UTC()
+		out.data[keys.FileModified] = time.UnixMilli(fm).UTC()
 
 		// int64 as file size
 		fs, err := strconv.ParseInt(vals[2], 10, 64)
@@ -376,7 +375,7 @@ func unixMillisToTimestampIfNotNull(indexRecord map[string]string, rawKey string
 	rawValue, found := indexRecord[rawKey]
 	if found && len(rawValue) > 0 {
 		if tsMillis, err := strconv.ParseInt(rawValue, 10, 64); err == nil {
-			return time.UnixMilli(tsMillis), true
+			return time.UnixMilli(tsMillis).UTC(), true
 		}
 	}
 

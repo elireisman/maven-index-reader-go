@@ -163,30 +163,32 @@ func (ir Index) remoteChunkExists(target string) error {
 }
 
 func (ir Index) remoteChunkTime(target string) (time.Time, error) {
+	errTime := time.Now().UTC()
+
 	resource, err := resources.FromConfig(ir.logger, ir.cfg, target)
 	defer resource.Close()
 
 	rdr, err := resource.Reader()
 	if err != nil {
-		return time.Now(), errors.Wrapf(err, "Index: failed to verify resource exists at %s with cause", resource)
+		return errTime, errors.Wrapf(err, "Index: failed to verify resource exists at %s with cause", resource)
 	}
 
 	gzRdr, err := gzip.NewReader(rdr)
 	if err != nil {
-		return time.Now(), errors.Wrapf(err, "Index: failed to wrap chunk time check for %s in GZIP Reader with cause", resource)
+		return errTime, errors.Wrapf(err, "Index: failed to wrap chunk time check for %s in GZIP Reader with cause", resource)
 	}
 	defer gzRdr.Close()
 
 	if _, err := utils.ReadByte(gzRdr); err != nil {
-		return time.Now(), errors.Wrapf(err, "Index: failed to read chunk %s version with cause", target)
+		return errTime, errors.Wrapf(err, "Index: failed to read chunk %s version with cause", target)
 	}
 
 	unixMillis, err := utils.ReadInt64(gzRdr)
 	if err != nil {
-		return time.Now(), errors.Wrapf(err, "Index: failed to read chunk %s timestamp with cause", target)
+		return errTime, errors.Wrapf(err, "Index: failed to read chunk %s timestamp with cause", target)
 	}
 
-	return time.UnixMilli(unixMillis), nil
+	return time.UnixMilli(unixMillis).UTC(), nil
 }
 
 func (ir Index) validateProperties(props data.Properties) error {

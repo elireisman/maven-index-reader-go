@@ -52,6 +52,7 @@ func TestSimpleChunk(t *testing.T) {
 	require.Equal(t, "pom", record.Get("packaging"))
 	require.Equal(t, "pom", record.Get("fileExtension"))
 	require.Equal(t, time.UnixMilli(1243533415343).UTC(), record.Get("fileModified"))
+	require.Equal(t, time.UnixMilli(1243533417953).UTC(), record.Get("recordModified"))
 
 	record = <-records
 	require.Equal(t, data.ArtifactAdd, record.Type())
@@ -61,6 +62,7 @@ func TestSimpleChunk(t *testing.T) {
 	require.Equal(t, "jar", record.Get("packaging"))
 	require.Equal(t, "jar", record.Get("fileExtension"))
 	require.Equal(t, time.UnixMilli(1243533415359).UTC(), record.Get("fileModified"))
+	require.Equal(t, time.UnixMilli(1243533417968).UTC(), record.Get("recordModified"))
 
 	record = <-records
 	require.Equal(t, data.RootGroups, record.Type())
