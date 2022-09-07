@@ -249,14 +249,14 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		}
 		out.data[keys.Packaging] = vals[0]
 
-		// int64 as Java "Unix" milliseconds timestamp
+		// Java "Unix milliseconds" timestamp
 		fm, err := strconv.ParseInt(vals[1], 10, 64)
 		if err != nil {
 			fm = 0
 		}
 		out.data[keys.FileModified] = time.UnixMilli(fm).UTC()
 
-		// int64 as file size
+		// int64 artifact byte size
 		fs, err := strconv.ParseInt(vals[2], 10, 64)
 		if err != nil {
 			fs = 0
@@ -272,11 +272,11 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 			pkgVal := vals[0]
 			if vals[0] != NotAvailable {
 				_, foundClassifier := out.data[keys.Classifier]
+
+				// default value; best guess
+				out.data[keys.FileExtension] = "jar"
 				if foundClassifier || pkgVal == "pom" || pkgVal == "war" || pkgVal == "ear" {
 					out.data[keys.FileExtension] = pkgVal
-				} else {
-					// default value; best guess
-					out.data[keys.FileExtension] = "jar"
 				}
 			}
 		}
@@ -293,13 +293,13 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		out.data[keys.Description] = desc
 	}
 	if sha1, ok := stringIfNotNull(indexRecord, SHA1Key); ok {
-		out.data[keys.Description] = sha1
+		out.data[keys.SHA1] = sha1
 	}
 	if classNames, ok := stringArrayIfNotNull(indexRecord, ClassnamesKey); ok {
 		out.data[keys.Classnames] = classNames
 	}
 
-	// populate OPTIONAL Maven Plugin fields, if present
+	// populate Maven Plugin fields, if present
 	if plgPrf, ok := stringIfNotNull(indexRecord, "px"); ok {
 		out.data[keys.PluginPrefix] = plgPrf
 	}
@@ -307,7 +307,7 @@ func newArtifactAddRecord(indexRecord map[string]string) (Record, error) {
 		out.data[keys.PluginGoals] = plgGoals
 	}
 
-	// populate OPTIONAL OSGI fields, if present
+	// populate OSGI fields, if present
 	if v, ok := stringIfNotNull(indexRecord, string(keys.OSGIBundleSymbolicName)); ok {
 		out.data[keys.OSGIBundleSymbolicName] = v
 	}
@@ -425,7 +425,7 @@ func splitValue(rawValue string) []string {
 
 	splits := strings.Split(rawValue, RecordValueSeparator)
 	for i := 0; i < len(splits); i++ {
-		elem := splits[i]
+		elem := strings.Trim(splits[i], " \t\r\n")
 		out = append(out, elem)
 	}
 
