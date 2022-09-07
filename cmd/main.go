@@ -20,6 +20,7 @@ var (
 	Format  string
 	Out     string
 	After   string
+	Only    string
 	Mode    string
 	Pool    int
 	Verbose bool
@@ -29,7 +30,8 @@ func init() {
 	flag.StringVar(&Format, "format", "log", "output format: one of 'log', 'json', 'csv'")
 	flag.StringVar(&Out, "out", "", "if set, specifies the output file path. stdout if unset")
 	flag.StringVar(&After, "after", "", "value depends on --mode; RFC 3339 time string, or int chunk ID, of the last successfully processed chunk")
-	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'after-time', 'after-chunk'")
+	flag.StringVar(&Only, "only", "", "value depends on --mode, incompatible with --after; the single chunk ID to process")
+	flag.StringVar(&Mode, "mode", "all", "one of 'all', 'after-time', 'after-chunk', 'only-chunk'")
 	flag.IntVar(&Pool, "pool", 4, "number of goroutines enabled to scan index chunks in parallel")
 	flag.BoolVar(&Verbose, "verbose", false, "log config, skipped records, and progress verbosely")
 }
@@ -71,6 +73,7 @@ func main() {
 		Mode: config.Mode{
 			Type:  config.ModeTypes[strings.ToLower(Mode)],
 			After: After,
+			Only:  Only,
 		},
 		Output: config.Output{
 			Format: config.OutputFormats[strings.ToLower(Format)],

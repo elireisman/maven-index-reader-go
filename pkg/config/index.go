@@ -24,17 +24,23 @@ func Validate(logger *log.Logger, cfg Index) error {
 	if len(cfg.Meta.ChainID) == 0 {
 		return errors.Errorf("Invalid configuration: index chain ID (Meta.ChainID) is required")
 	}
+
 	if len(cfg.Source.Base) == 0 {
 		return errors.Errorf("Invalid configuration: index base URL (Source.Base) is required")
 	}
 	if cfg.Source.Type != Local && cfg.Source.Type != HTTP {
 		return errors.Errorf("Invalid configuration: index location (Source.Type) is required")
 	}
+
 	if cfg.Output.Format != Log && cfg.Output.Format != CSV && cfg.Output.Format != JSON {
 		return errors.Errorf("Invalid configuration: valid format type (Output.Format) is required")
 	}
-	if cfg.Mode.Type > All && len(cfg.Mode.After) == 0 {
-		return errors.New("Invalid configuration: Mode.Type specifies incremental run but Mode.After empty")
+
+	if cfg.Mode.Type > All && len(cfg.Mode.After) == 0 && len(cfg.Mode.Only) == 0 {
+		return errors.New("Invalid configuration: Mode.Type specifies incremental run but neither Mode.After or Mode.Only are set")
+	}
+	if len(cfg.Mode.After) > 0 && len(cfg.Mode.Only) > 0 {
+		return errors.New("Invalid configuration: only one of Mode.After and Mode.Only can be set")
 	}
 	switch cfg.Mode.Type {
 	case AfterChunk:
@@ -45,6 +51,11 @@ func Validate(logger *log.Logger, cfg Index) error {
 	case AfterTime:
 		if _, err := time.Parse(time.RFC3339, cfg.Mode.After); err != nil {
 			return errors.Wrapf(err, "Invalid configuration: invalid timestamp on Mode.After (%s) with cause", cfg.Mode.After)
+		}
+
+	case OnlyChunk:
+		if _, err := strconv.Atoi(cfg.Mode.Only); err != nil {
+			return errors.Wrapf(err, "Invalid configuration: invalid integer on Mode.Only (%s) with cause", cfg.Mode.After)
 		}
 
 	case All:
@@ -78,11 +89,13 @@ type Meta struct {
 }
 
 type Mode struct {
-	// one of 'all', 'after-time' or 'after-chunk'
+	// one of 'all', 'after-time' or 'after-chunk', 'only-chunk'
 	Type ModeType
 	// time.Time string since, or chunk ID of, last successfully
 	// ingested incremental chunk, depending on specified ModeType
 	After string
+	// integer-valued string specifying the single chunk to process
+	Only string
 }
 
 func (m Mode) Incremental() bool {
@@ -96,12 +109,14 @@ const (
 	All
 	AfterTime
 	AfterChunk
+	OnlyChunk
 )
 
 var ModeTypes = map[string]ModeType{
 	"all":         All,
 	"after-time":  AfterTime,
 	"after-chunk": AfterChunk,
+	"only-chunk":  OnlyChunk,
 }
 
 type Source struct {

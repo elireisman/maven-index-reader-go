@@ -142,6 +142,22 @@ func (ir Index) enumerateIndexChunks(latestChunkID int) ([]string, error) {
 			time.Sleep(500 * time.Millisecond)
 		}
 
+	case config.OnlyChunk:
+		chunkID, err := strconv.Atoi(ir.cfg.Mode.Only)
+		if err != nil {
+			return out, errors.Wrapf(err, "Index: failed to parse chunk ID %s with cause", ir.cfg.Mode.Only)
+		}
+
+		candidate := ir.cfg.ResolveTarget(".%d.gz", chunkID)
+		if err := ir.remoteChunkExists(candidate); err != nil {
+			return out, errors.Wrapf(err, "Index: failed to resolve remote chunk at %s with cause", candidate)
+		}
+
+		if ir.cfg.Verbose {
+			ir.logger.Printf("Index: selected chunk %s", candidate)
+		}
+		out = append(out, candidate)
+
 	default: // config.All
 		// full index suffix is of the form ".<file_extension>"
 		out = append(out, ir.cfg.ResolveTarget(".gz"))
